@@ -1,0 +1,17 @@
+[package]
+name = "inkpaper-desktop"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+btleplug = "0.11"
+eframe = "0.28"
+egui = "0.28"
+futures = "0.3"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "blocking"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serialport = "4"
+tokio = { version = "1", features = ["full"] }
+uuid = "1"
