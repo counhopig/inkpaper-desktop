@@ -1,0 +1,223 @@
+/*
+ * Inkpaper Desktop · layout utilities
+ * ----------------------------------------------------------------------
+ * Shell = full-height sidebar on the left + a status bar over the
+ * content column. Content sits on the paper background; cards float on
+ * white. No absolute positioning, no rounded corners, hierarchy carried
+ * by line weight, double rules, and spacing.
+ */
+
+.app-root {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  grid-template-rows: var(--topbar-h) 1fr;
+  grid-template-areas:
+    "sidebar topbar"
+    "sidebar main";
+  width: 100vw;
+  height: 100vh;
+  min-width: 900px;
+  min-height: 640px;
+}
+
+.app-root > .topbar-slot { grid-area: topbar; }
+.app-root > .sidebar-slot { grid-area: sidebar; }
+.app-root > .main-slot {
+  grid-area: main;
+  overflow: auto;
+  padding: var(--s-6) var(--s-7);
+}
+
+/* Collapse the sidebar to a rail only when the window is genuinely
+   narrow (below the app's 900px minimum). 960px was too aggressive
+   for a desktop app and hid the labels on normal-sized windows. */
+@media (max-width: 760px) {
+  .app-root {
+    grid-template-columns: 60px 1fr;
+  }
+  :root { --sidebar-w: 60px; }
+  .app-root > .main-slot {
+    padding: var(--s-4) var(--s-4);
+  }
+}
+
+/* ============ Sidebar ============ */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border-right: var(--b-1);
+  padding: var(--s-5) 0 var(--s-4);
+  min-height: 0;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 0 var(--s-4) var(--s-5);
+  border-bottom: var(--b-1-dashed);
+  margin-bottom: var(--s-4);
+}
+
+.sidebar-brand .mark {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: grid;
+  place-items: center;
+  border: var(--b-2);
+  font-family: var(--font-mono);
+  font-size: var(--t-15);
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.sidebar-brand .wordmark {
+  min-width: 0;
+}
+
+.sidebar-brand .name {
+  font-family: var(--font-display);
+  font-size: var(--t-16);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+
+.sidebar-brand .sub {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: var(--t-11);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sidebar-nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 var(--s-3);
+  overflow-y: auto;
+}
+
+.sidebar-foot {
+  padding: var(--s-4) var(--s-4) 0;
+  border-top: var(--b-1-dashed);
+  margin: var(--s-4) var(--s-2) 0;
+}
+
+/* ============ Topbar (status bar) ============ */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding: 0 var(--s-5);
+  background: var(--surface);
+  border-bottom: var(--b-1);
+}
+
+.topbar-status {
+  display: flex;
+  align-items: center;
+  gap: var(--s-5);
+}
+
+.topbar-clock {
+  font-family: var(--font-mono);
+  font-size: var(--t-12);
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+/* ============ Page ============ */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+  max-width: 1240px;
+  margin: 0 auto;
+  padding-bottom: var(--s-10);
+  min-width: 0;
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s-6);
+  padding-bottom: var(--s-4);
+  border-bottom: var(--b-1);
+}
+
+.page-title {
+  font-family: var(--font-display);
+  font-size: var(--t-26);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.page-subtitle {
+  margin: 5px 0 0;
+  color: var(--ink-muted);
+  font-size: var(--t-13);
+  line-height: 1.45;
+  max-width: 56ch;
+}
+
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* ============ Grid ============ */
+.page-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: var(--s-5);
+}
+
+.col-12 { grid-column: span 12; }
+.col-8 { grid-column: span 8; }
+.col-6 { grid-column: span 6; }
+.col-4 { grid-column: span 4; }
+.col-3 { grid-column: span 3; }
+
+@media (max-width: 1120px) {
+  .col-3, .col-4 { grid-column: span 6; }
+  .col-8, .col-6 { grid-column: span 12; }
+}
+
+/* ============ Common rows / stacks ============ */
+.row { display: flex; align-items: center; gap: var(--s-3); }
+.row.between { justify-content: space-between; }
+.row.end { justify-content: flex-end; }
+.row.wrap { flex-wrap: wrap; }
+.stack { display: flex; flex-direction: column; gap: var(--s-3); }
+.stack-tight { display: flex; flex-direction: column; gap: var(--s-2); }
+.stack-loose { display: flex; flex-direction: column; gap: var(--s-5); }
+
+/* ============ Key-value list ============ */
+.kv {
+  display: grid;
+  grid-template-columns: 148px 1fr;
+  gap: var(--s-3) var(--s-4);
+  font-size: var(--t-13);
+  align-items: baseline;
+}
+.kv > .k {
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: var(--t-11);
+}
+.kv > .v { font-variant-numeric: tabular-nums; }
