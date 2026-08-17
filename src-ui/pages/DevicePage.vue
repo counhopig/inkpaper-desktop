@@ -7,6 +7,7 @@ import Notice from "../components/Notice.vue";
 import StatusMark from "../components/StatusMark.vue";
 import EmptyState from "../components/EmptyState.vue";
 import { useDeviceStore } from "../stores/device";
+import { useServerStore } from "../stores/server";
 import {
   listCommonTimezones,
   systemTimezoneOffsetMinutes,
@@ -24,13 +25,26 @@ import {
 } from "../lib/commands";
 
 const device = useDeviceStore();
+const server = useServerStore();
 const refreshing = ref(false);
 
 const selectedPort = ref("");
 const ssid = ref("");
 const password = ref("");
 const showPassword = ref(false);
-const serverUrl = ref("");
+// Seed from the admin connection already configured on the Content page -
+// it's the same server/port, already proven reachable there, so retyping
+// it by hand can't drop the port. This field is NOT the admin base URL
+// though: the firmware POSTs to it verbatim with no path construction of
+// its own (see sync.rs's fetch_and_apply), so it must be the full sync
+// endpoint - append /api/sync, matching the route the server actually
+// accepts POSTs on (routes.rs mounts device_push_sync at "/api/sync";
+// "/" only serves the admin page and returns 405 on POST).
+function deriveSyncUrl(adminBaseUrl: string): string {
+  if (!adminBaseUrl) return "";
+  return `${adminBaseUrl.replace(/\/+$/, "")}/api/sync`;
+}
+const serverUrl = ref(deriveSyncUrl(server.baseUrl));
 const serverToken = ref("");
 const tzOffset = ref<number>(systemTimezoneOffsetMinutes());
 
@@ -144,6 +158,10 @@ const tzChoices = computed(() =>
       </div>
     </header>
 
+    <Notice v-if="device.ops.sync?.state === 'error'" variant="error" :title="device.ops.sync.errorCode ?? 'Sync failed'">
+      {{ device.ops.sync.errorMessage }}
+    </Notice>
+
     <div class="page-grid">
       <div class="col-6">
         <Frame title="Connection" :subtitle="device.connection.kind">
@@ -237,8 +255,8 @@ const tzChoices = computed(() =>
 
       <div class="col-6">
         <Frame title="Sync server" subtitle="Public URL + device token">
-          <Field label="Server URL" :error="urlError ?? undefined">
-            <input v-model="serverUrl" type="text" placeholder="http://192.168.1.10:8080" />
+          <Field label="Server URL" :error="urlError ?? undefined" hint="The device POSTs to this exact URL - include the /api/sync path.">
+            <input v-model="serverUrl" type="text" placeholder="http://192.168.1.10:8080/api/sync" />
           </Field>
           <Field label="Device token" :error="tokenError ?? undefined" hint="Issued by the server when you register the device. Not the Admin Token.">
             <input v-model="serverToken" type="text" placeholder="paste device token here" />
