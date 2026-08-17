@@ -1,13 +1,20 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useDeviceStore } from "../stores/device";
 import { useServerStore } from "../stores/server";
 
 const device = useDeviceStore();
 const server = useServerStore();
 
+const nowMs = ref(Date.now());
+let clockTimer: ReturnType<typeof setInterval> | undefined;
+onMounted(() => {
+  clockTimer = setInterval(() => (nowMs.value = Date.now()), 1000);
+});
+onBeforeUnmount(() => clearInterval(clockTimer));
+
 const now = computed(() =>
-  new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+  new Date(nowMs.value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
 );
 
 const deviceGlyph = computed(() => {

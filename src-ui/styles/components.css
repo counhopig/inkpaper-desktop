@@ -23,20 +23,33 @@
 
 .frame-title {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
+  row-gap: 2px;
   gap: var(--s-4);
   padding-bottom: var(--s-3);
   border-bottom: var(--b-1-faint);
 }
+/* The slot/title wrapper (first child) should claim the row's width so a
+   custom #header (e.g. the Logs toolbar) lays out against the full card
+   width instead of shrink-wrapping to its own content. */
+.frame-title > div:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
 .frame-title h2 {
   margin: 0;
+  flex: 0 1 auto;
+  white-space: nowrap;
   font-family: var(--font-display);
   font-size: var(--t-16);
   font-weight: 600;
   letter-spacing: -0.005em;
 }
 .frame-title .sub {
+  flex: 0 1 auto;
+  text-align: right;
   font-size: var(--t-11);
   color: var(--ink-muted);
   text-transform: uppercase;
@@ -489,7 +502,7 @@
 /* ============ Log entry ============ */
 .log-entry {
   display: grid;
-  grid-template-columns: 100px 100px 90px 1fr;
+  grid-template-columns: 150px 90px 60px 1fr;
   gap: var(--s-3);
   padding: 2px var(--s-3);
   font-family: var(--font-mono);
@@ -499,6 +512,12 @@
   white-space: nowrap;
 }
 .log-entry:first-child { border-top: 0; }
+.log-entry .ts,
+.log-entry .src,
+.log-entry .lvl {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .log-entry .ts { color: var(--ink-muted); }
 .log-entry .src { color: var(--ink); font-weight: 500; }
 .log-entry .lvl { text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }

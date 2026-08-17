@@ -55,6 +55,18 @@ export const useServerStore = defineStore("server", () => {
       devices.value = r.value;
       connected.value = true;
       lastError.value = null;
+      // A device selected in an earlier session (persisted to localStorage)
+      // may no longer exist on this server - e.g. its DB was reset, or the
+      // base URL now points at a different server. Drop the stale
+      // selection instead of leaving it referencing a nonexistent device,
+      // which would otherwise let alarm/todo writes hit a foreign key
+      // that no longer resolves.
+      if (
+        selectedDeviceId.value != null &&
+        !r.value.some((d) => d.id === selectedDeviceId.value)
+      ) {
+        selectDevice(null);
+      }
     } else {
       lastError.value = { code: r.error.code, message: r.error.message };
       connected.value = false;

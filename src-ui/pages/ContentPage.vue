@@ -15,6 +15,7 @@ const server = useServerStore();
 
 const newDeviceName = ref("");
 const registerError = ref<string | null>(null);
+const registeredToken = ref<string | null>(null);
 
 const showServerToken = ref(false);
 const newAlarm = ref<AlarmInput>({
@@ -47,6 +48,7 @@ async function connect() {
 
 async function register() {
   registerError.value = null;
+  registeredToken.value = null;
   const name = newDeviceName.value.trim();
   if (!name) {
     registerError.value = "Name must not be empty";
@@ -55,6 +57,7 @@ async function register() {
   const r = await server.registerDevice(name);
   if (r.ok) {
     newDeviceName.value = "";
+    registeredToken.value = r.value.token ?? null;
     server.selectDevice(r.value.id);
     await server.refreshContent();
   } else {
@@ -62,11 +65,16 @@ async function register() {
   }
 }
 
+function copyRegisteredToken() {
+  if (registeredToken.value) navigator.clipboard.writeText(registeredToken.value).catch(() => {});
+}
+
 async function unregister(id: number) {
   await server.deleteDevice(id);
 }
 
 async function pick(id: number) {
+  registeredToken.value = null;
   server.selectDevice(id);
   await server.refreshContent();
 }
@@ -240,6 +248,17 @@ function onOnceDateChange() {
             <Button variant="primary" :disabled="!server.connected" @click="register">Register</Button>
           </div>
           <Notice v-if="registerError" variant="error">{{ registerError }}</Notice>
+          <Notice v-if="registeredToken" variant="info" title="Device token (shown once)">
+            <div class="row" style="gap: var(--s-2); align-items: flex-start;">
+              <div style="flex: 1; min-width: 0; font-family: var(--font-mono); font-size: var(--t-12); word-break: break-all;">
+                {{ registeredToken }}
+              </div>
+              <Button size="small" variant="ghost" @click="copyRegisteredToken">Copy</Button>
+            </div>
+            <div class="hint" style="margin-top: var(--s-2);">
+              Paste into Device → Sync server → Device token. It will not be shown again.
+            </div>
+          </Notice>
         </Frame>
       </div>
 
@@ -301,7 +320,7 @@ function onOnceDateChange() {
               <Button
                 v-if="editingAlarmId == null"
                 variant="primary"
-                :disabled="!server.connected || !server.selectedDeviceId || !isAlarmFormValid(newAlarm)"
+                :disabled="!server.connected || !server.selectedDevice || !isAlarmFormValid(newAlarm)"
                 @click="addAlarm"
               >
                 Add alarm
@@ -341,7 +360,7 @@ function onOnceDateChange() {
           <div class="row end" style="margin-top: var(--s-3);">
             <Button
               variant="danger"
-              :disabled="!server.connected || !server.selectedDeviceId || server.alarms.length === 0"
+              :disabled="!server.connected || !server.selectedDevice || server.alarms.length === 0"
               @click="confirmClearAlarms = true"
             >
               Clear all alarms
@@ -363,7 +382,7 @@ function onOnceDateChange() {
               <Button
                 v-if="editingTodoId == null"
                 variant="primary"
-                :disabled="!server.connected || !server.selectedDeviceId || !isTodoFormValid(newTodo)"
+                :disabled="!server.connected || !server.selectedDevice || !isTodoFormValid(newTodo)"
                 @click="addTodo"
               >
                 Add todo
@@ -402,7 +421,7 @@ function onOnceDateChange() {
           <div class="row end" style="margin-top: var(--s-3);">
             <Button
               variant="danger"
-              :disabled="!server.connected || !server.selectedDeviceId || server.todos.length === 0"
+              :disabled="!server.connected || !server.selectedDevice || server.todos.length === 0"
               @click="confirmClearTodos = true"
             >
               Clear all todos

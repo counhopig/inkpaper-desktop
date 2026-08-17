@@ -87,26 +87,27 @@ function copyAll() {
 
     <Frame spacing="flush">
       <template #header>
-        <div class="row between" style="padding: var(--s-3) var(--s-4); gap: var(--s-3); flex-wrap: wrap;">
-          <div class="btn-row">
-            <Button
-              v-for="f in filterOptions"
-              :key="f.id"
-              size="small"
-              :variant="logs.filter === f.id ? 'primary' : 'default'"
-              @click="logs.filter = f.id"
-            >
-              {{ f.label }}
-            </Button>
-          </div>
-          <div class="row" style="flex: 1; min-width: 200px;">
-            <input
-              :value="logs.query"
-              @input="(e) => (logs.query = (e.target as HTMLInputElement).value)"
-              type="search"
-              placeholder="search source or message"
-              style="flex: 1; padding: 4px var(--s-3); border: 1px solid var(--line); background: var(--surface);"
-            />
+        <div class="logs-toolbar">
+          <div class="logs-toolbar-row">
+            <div class="btn-row">
+              <Button
+                v-for="f in filterOptions"
+                :key="f.id"
+                size="small"
+                :variant="logs.filter === f.id ? 'primary' : 'default'"
+                @click="logs.filter = f.id"
+              >
+                {{ f.label }}
+              </Button>
+            </div>
+            <div class="logs-search field">
+              <input
+                :value="logs.query"
+                @input="(e) => (logs.query = (e.target as HTMLInputElement).value)"
+                type="search"
+                placeholder="Search source or message"
+              />
+            </div>
             <Button
               size="small"
               :variant="logs.paused ? 'primary' : 'default'"
@@ -115,12 +116,14 @@ function copyAll() {
               {{ logs.paused ? "Resume" : "Pause" }}
             </Button>
           </div>
-          <div class="btn-row">
-            <Button size="small" variant="ghost" @click="copySelected">Copy view</Button>
-            <Button size="small" variant="ghost" @click="copyAll">Copy all</Button>
-            <Button size="small" variant="ghost" @click="clearView">Clear view</Button>
-            <Button size="small" variant="ghost" @click="doOpenFolder">Open folder</Button>
-            <Button size="small" variant="ghost" @click="doExportLog">Export log</Button>
+          <div class="logs-toolbar-row">
+            <div class="btn-row">
+              <Button size="small" variant="ghost" @click="copySelected">Copy view</Button>
+              <Button size="small" variant="ghost" @click="copyAll">Copy all</Button>
+              <Button size="small" variant="ghost" @click="clearView">Clear view</Button>
+              <Button size="small" variant="ghost" @click="doOpenFolder">Open folder</Button>
+              <Button size="small" variant="ghost" @click="doExportLog">Export log</Button>
+            </div>
           </div>
         </div>
       </template>
@@ -155,3 +158,24 @@ function copyAll() {
     </Frame>
   </div>
 </template>
+
+<style scoped>
+.logs-toolbar {
+  display: flex;
+  flex-direction: column;
+}
+.logs-toolbar-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+}
+.logs-toolbar-row + .logs-toolbar-row {
+  padding-top: 0;
+}
+.logs-search {
+  flex: 1 1 220px;
+  min-width: 180px;
+}
+</style>
