@@ -3,10 +3,10 @@
 //! plain JSON (no line framing needed - GATT writes are already
 //! message-delimited), replies arrive as notifications on the separate
 //! notify characteristic. Runs its own Tokio runtime on a dedicated
-//! thread, since `btleplug` is async-only and the egui UI thread is not -
-//! same "worker thread + `std::sync::mpsc` channel" shape as
-//! `transport::usb`, just with an async worker body instead of a blocking
-//! one.
+//! thread, since `btleplug` is async-only and the Tauri runtime's
+//! tokio-blocking boundary cannot host it directly - same "worker
+//! thread + `std::sync::mpsc` channel" shape as `transport::usb`, just
+//! with an async worker body instead of a blocking one.
 
 use std::sync::mpsc;
 use std::thread;
@@ -31,11 +31,60 @@ pub enum BleEvent {
 }
 
 pub struct BleLink {
-    cmd_tx: mpsc::Sender<Command>,
+    pub(crate) cmd_tx: mpsc::Sender<Command>,
     pub event_rx: mpsc::Receiver<BleEvent>,
 }
 
 impl BleLink {
+    /// Diagnostic snapshot of every peripheral CoreBluetooth exposed during
+    /// a short scan. Used by the CLI to distinguish filtering bugs from a
+    /// scan that receives no advertisements at all.
+    pub fn scan_report() -> anyhow::Result<Vec<String>> {
+        let rt = tokio::runtime::Runtime::new()?;
+        rt.block_on(async {
+            let manager = Manager::new().await?;
+            let adapter = manager
+                .adapters()
+                .await?
+                .into_iter()
+                .next()
+                .ok_or_else(|| anyhow::anyhow!("no BLE adapter available"))?;
+            adapter.start_scan(ScanFilter::default()).await?;
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            let mut report = Vec::new();
+            for peripheral in adapter.peripherals().await? {
+                match peripheral.properties().await {
+                    Ok(Some(props)) => report.push(format!("{props:?}")),
+                    Ok(None) => report.push(format!("{:?}: no properties", peripheral.id())),
+                    Err(err) => report.push(format!("{:?}: {err}", peripheral.id())),
+                }
+            }
+            adapter.stop_scan().await.ok();
+            Ok(report)
+        })
+    }
+
+    /// Background-friendly discovery probe. The firmware advertises only
+    /// while its BLE Pairing page is open.
+    pub fn discover() -> anyhow::Result<bool> {
+        let rt = tokio::runtime::Runtime::new()?;
+        rt.block_on(async {
+            let manager = Manager::new().await?;
+            let adapters = manager.adapters().await?;
+            let Some(adapter) = adapters.into_iter().next() else {
+                return Err(anyhow::anyhow!(
+                    "no BLE adapter is available to this app; check that Bluetooth is on and allow Bluetooth access in System Settings > Privacy & Security > Bluetooth"
+                ));
+            };
+            adapter.start_scan(ScanFilter::default()).await?;
+            let found = find_device_with_retries(&adapter, DEVICE_NAME, 8)
+                .await
+                .is_ok();
+            adapter.stop_scan().await.ok();
+            Ok(found)
+        })
+    }
+
     /// Scans for a device named `DEVICE_NAME`, connects, and subscribes to
     /// the reply characteristic. Blocks the calling thread until connected
     /// or the scan/connect attempt fails - call this from a worker thread
@@ -55,12 +104,14 @@ impl BleLink {
                 }
             };
             rt.block_on(async {
-                match connect_and_run(cmd_rx, event_tx.clone()).await {
-                    Ok(()) => {
-                        let _ = ready_tx.send(Ok(()));
-                    }
+                match connect_and_run(cmd_rx, event_tx.clone(), &ready_tx).await {
+                    Ok(()) => {}
                     Err(e) => {
+                        // If setup failed this wakes connect(); if setup had
+                        // already succeeded, the receiver is gone and the
+                        // disconnect event below is what the UI observes.
                         let _ = ready_tx.send(Err(anyhow::anyhow!("{e}")));
+                        let _ = event_tx.send(BleEvent::Disconnected(e.to_string()));
                     }
                 }
             });
@@ -77,6 +128,7 @@ impl BleLink {
         Ok(Self { cmd_tx, event_rx })
     }
 
+    #[allow(dead_code)]
     pub fn send(&self, cmd: Command) -> anyhow::Result<()> {
         self.cmd_tx
             .send(cmd)
@@ -87,6 +139,7 @@ impl BleLink {
 async fn connect_and_run(
     cmd_rx: mpsc::Receiver<Command>,
     event_tx: mpsc::Sender<BleEvent>,
+    ready_tx: &mpsc::Sender<anyhow::Result<()>>,
 ) -> anyhow::Result<()> {
     let manager = Manager::new().await?;
     let adapters = manager.adapters().await?;
@@ -118,6 +171,13 @@ async fn connect_and_run(
 
     peripheral.subscribe(&notify_char).await?;
     let mut notifications = peripheral.notifications().await?;
+
+    // Report readiness as soon as GATT setup is complete. Previously this
+    // was sent only after this long-running loop returned, so the Desktop
+    // UI could never receive a live BleLink.
+    ready_tx
+        .send(Ok(()))
+        .map_err(|_| anyhow::anyhow!("BLE connection requester went away"))?;
 
     let _ = event_tx.send(BleEvent::Log(format!(
         "connected to {DEVICE_NAME} (service {SERVICE_UUID})"
@@ -170,15 +230,29 @@ async fn find_device(
     adapter: &btleplug::platform::Adapter,
     name: &str,
 ) -> anyhow::Result<Peripheral> {
+    find_device_with_retries(adapter, name, 20).await
+}
+
+async fn find_device_with_retries(
+    adapter: &btleplug::platform::Adapter,
+    name: &str,
+    retries: usize,
+) -> anyhow::Result<Peripheral> {
+    let service_uuid = Uuid::parse_str(SERVICE_UUID)?;
     // A handful of short retries rather than one long wait: advertising
     // packets aren't guaranteed to be seen on the very first scan pass,
     // but this device only advertises while its BLE Pairing screen is
     // open (see `docs/control-protocol.md`'s Lifecycle notes), so we
     // don't want to hang indefinitely if the user hasn't opened it yet.
-    for _ in 0..20 {
+    for _ in 0..retries {
         for p in adapter.peripherals().await? {
             if let Ok(Some(props)) = p.properties().await {
-                if props.local_name.as_deref() == Some(name) {
+                // CoreBluetooth does not consistently expose local_name for
+                // unpaired peripherals. The advertised service UUID is the
+                // stable identity and is also more specific than the name.
+                if props.local_name.as_deref() == Some(name)
+                    || props.services.contains(&service_uuid)
+                {
                     return Ok(p);
                 }
             }

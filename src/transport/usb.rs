@@ -25,17 +25,26 @@ pub enum UsbEvent {
 }
 
 pub struct UsbLink {
-    cmd_tx: mpsc::Sender<Command>,
+    pub(crate) cmd_tx: mpsc::Sender<Command>,
     pub event_rx: mpsc::Receiver<UsbEvent>,
 }
 
 impl UsbLink {
     /// Opens `port_name` and spawns the reader/writer worker thread.
     pub fn connect(port_name: &str) -> anyhow::Result<Self> {
-        let port = serialport::new(port_name, BAUD_RATE)
+        let mut port = serialport::new(port_name, BAUD_RATE)
             .timeout(Duration::from_millis(200))
             .open()
             .map_err(|e| anyhow::anyhow!("failed to open {port_name}: {e}"))?;
+
+        // ESP32-S3 USB Serial/JTAG uses modem-control lines for reset and
+        // download-mode entry. Explicitly release both after opening; host
+        // defaults vary and can otherwise leave the device silent while the
+        // port itself still appears to have opened successfully.
+        port.write_data_terminal_ready(false)
+            .map_err(|e| anyhow::anyhow!("failed to release DTR on {port_name}: {e}"))?;
+        port.write_request_to_send(false)
+            .map_err(|e| anyhow::anyhow!("failed to release RTS on {port_name}: {e}"))?;
 
         let (cmd_tx, cmd_rx) = mpsc::channel::<Command>();
         let (event_tx, event_rx) = mpsc::channel::<UsbEvent>();
@@ -75,7 +84,9 @@ fn run_worker(
             Ok(n) => {
                 for &b in &read_buf[..n] {
                     if b == b'\n' {
-                        let line = String::from_utf8_lossy(&line_buf).trim_end_matches('\r').to_string();
+                        let line = String::from_utf8_lossy(&line_buf)
+                            .trim_end_matches('\r')
+                            .to_string();
                         line_buf.clear();
                         if let Some(json) = line.strip_prefix(REPLY_PREFIX) {
                             match protocol::decode_reply(json) {
@@ -85,9 +96,8 @@ fn run_worker(
                                     }
                                 }
                                 Err(err) => {
-                                    let _ = event_tx.send(UsbEvent::Log(format!(
-                                        "(unparseable reply: {err})"
-                                    )));
+                                    let _ = event_tx
+                                        .send(UsbEvent::Log(format!("(unparseable reply: {err})")));
                                 }
                             }
                         } else if !line.is_empty() {
@@ -112,7 +122,24 @@ fn run_worker(
 
 /// Lists available serial port names for the connection picker.
 pub fn list_ports() -> Vec<String> {
-    serialport::available_ports()
-        .map(|ports| ports.into_iter().map(|p| p.port_name).collect())
-        .unwrap_or_default()
+    let ports = serialport::available_ports().unwrap_or_default();
+    let mut espressif: Vec<String> = ports
+        .iter()
+        .filter(|port| {
+            matches!(
+                &port.port_type,
+                serialport::SerialPortType::UsbPort(info) if info.vid == 0x303a
+            )
+        })
+        .map(|port| port.port_name.clone())
+        .collect();
+    if espressif.is_empty() {
+        espressif = ports
+            .into_iter()
+            .filter(|port| matches!(port.port_type, serialport::SerialPortType::UsbPort(_)))
+            .map(|port| port.port_name)
+            .collect();
+    }
+    espressif.sort();
+    espressif
 }
