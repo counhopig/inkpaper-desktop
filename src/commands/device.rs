@@ -32,6 +32,11 @@ use crate::state::{AppState, BleHandle, LinkState, UsbHandle};
 use crate::transport::{ble::BleLink, usb::UsbLink};
 
 const DEVICE_CMD_TIMEOUT: Duration = Duration::from_secs(45);
+// Opening the ESP32-S3 USB Serial/JTAG port resets the chip, so a command
+// sent immediately after connect can be lost while the device boots. Resend
+// on USB until a reply arrives - same behaviour as the CLI (`main.rs`).
+// All protocol commands are idempotent, so a resent command is safe.
+const RETRY_INTERVAL: Duration = Duration::from_secs(2);
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -48,6 +53,13 @@ pub struct DeviceStatus {
     pub wifi_configured: bool,
     pub server_configured: bool,
     pub wifi_connected: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wifi_ssid: Option<String>,
+    pub wifi_has_password: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_url: Option<String>,
+    pub server_has_token: bool,
+    pub timezone_offset_minutes: i16,
 }
 
 fn result_from_reply(reply: Reply) -> DeviceCommandResult {
@@ -61,6 +73,11 @@ fn result_from_reply(reply: Reply) -> DeviceCommandResult {
             wifi_configured,
             server_configured,
             wifi_connected,
+            wifi_ssid,
+            wifi_has_password,
+            server_url,
+            server_has_token,
+            timezone_offset_minutes,
         } => DeviceCommandResult {
             kind: "status".into(),
             message: "Device status received".into(),
@@ -68,6 +85,11 @@ fn result_from_reply(reply: Reply) -> DeviceCommandResult {
                 wifi_configured,
                 server_configured,
                 wifi_connected,
+                wifi_ssid,
+                wifi_has_password,
+                server_url,
+                server_has_token,
+                timezone_offset_minutes,
             }),
         },
         Reply::Error { message } => DeviceCommandResult {
@@ -83,9 +105,10 @@ fn result_from_reply(reply: Reply) -> DeviceCommandResult {
 /// mpsc receiver. Wrap in `spawn_blocking` at the command entry point.
 fn send_and_wait(state: &AppState, command: Command) -> Result<DeviceCommandResult, AppError> {
     let deadline = Instant::now() + DEVICE_CMD_TIMEOUT;
+    let mut next_resend = Instant::now() + RETRY_INTERVAL;
 
-    // Log first - the command is consumed by `handle.send` below, so
-    // we can't borrow it for logging afterwards.
+    // Log first - the command is also sent via `handle.send` below and
+    // may be resent while the device boots, so log before the first send.
     state.logs.info(
         "device",
         format!(
@@ -106,11 +129,11 @@ fn send_and_wait(state: &AppState, command: Command) -> Result<DeviceCommandResu
         match &mut *guard {
             LinkState::Disconnected => return Err(AppError::device_not_connected()),
             LinkState::Usb(handle) => {
-                handle.send(command)?;
+                handle.send(command.clone())?;
                 Phase::Usb
             }
             LinkState::Ble(handle) => {
-                handle.send(command)?;
+                handle.send(command.clone())?;
                 Phase::Ble
             }
         }
@@ -175,7 +198,17 @@ fn send_and_wait(state: &AppState, command: Command) -> Result<DeviceCommandResu
                 clear_link(state);
                 return Err(AppError::device_disconnected(reason));
             }
-            TickEvent::Usb(Err(_)) | TickEvent::Ble(Err(_)) => continue,
+            TickEvent::Usb(Err(_)) | TickEvent::Ble(Err(_)) => {
+                if matches!(phase, Phase::Usb) && Instant::now() >= next_resend {
+                    if let Ok(mut guard) = state.link.lock() {
+                        if let LinkState::Usb(handle) = &mut *guard {
+                            let _ = handle.send(command.clone());
+                        }
+                    }
+                    next_resend = Instant::now() + RETRY_INTERVAL;
+                }
+                continue;
+            }
         }
     }
 }
@@ -354,10 +387,10 @@ pub async fn set_timezone(
     offset_minutes: i16,
     state: State<'_, SharedState>,
 ) -> Result<DeviceCommandResult, AppError> {
-    if !(-14 * 60..=14 * 60).contains(&offset_minutes) || offset_minutes % 15 != 0 {
+    if !(-12 * 60..=14 * 60).contains(&offset_minutes) || offset_minutes % 15 != 0 {
         return Err(AppError::invalid_input(
             "offset_minutes",
-            "must be a multiple of 15 between -14:00 and +14:00",
+            "must be a multiple of 15 between -12:00 and +14:00",
         ));
     }
     let shared = state.inner().clone();

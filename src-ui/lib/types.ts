@@ -40,6 +40,11 @@ export interface DeviceStatus {
   wifiConfigured: boolean;
   serverConfigured: boolean;
   wifiConnected: boolean;
+  wifiSsid?: string;
+  wifiHasPassword?: boolean;
+  serverUrl?: string;
+  serverHasToken?: boolean;
+  timezoneOffsetMinutes?: number;
 }
 
 export interface DeviceCommandResult {

@@ -58,7 +58,7 @@ export function validateTodo(input: TodoInput): FieldErrors<TodoInput> {
 
 export function validateTimezone(offset: number): string | null {
   if (!Number.isFinite(offset)) return "not a number";
-  if (offset < -14 * 60 || offset > 14 * 60) return "out of range";
+  if (offset < -12 * 60 || offset > 14 * 60) return "out of range";
   if (offset % 15 !== 0) return "must be a multiple of 15 minutes";
   return null;
 }

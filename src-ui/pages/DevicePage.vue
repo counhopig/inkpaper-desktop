@@ -208,10 +208,24 @@ const tzChoices = computed(() =>
             <div class="v">{{ device.connection.kind }} · {{ device.connection.port }}</div>
             <div class="k">Wi-Fi configured</div>
             <div class="v"><StatusMark :status="device.deviceStatus?.wifiConfigured ? 'ok' : 'idle'" :label="device.deviceStatus?.wifiConfigured ? 'yes' : 'no'" /></div>
+            <template v-if="device.deviceStatus?.wifiSsid">
+              <div class="k">Wi-Fi SSID</div>
+              <div class="v">{{ device.deviceStatus.wifiSsid }}</div>
+              <div class="k">Wi-Fi password</div>
+              <div class="v"><StatusMark :status="device.deviceStatus.wifiHasPassword ? 'ok' : 'idle'" :label="device.deviceStatus.wifiHasPassword ? 'set' : 'none'" /></div>
+            </template>
             <div class="k">Wi-Fi connected</div>
             <div class="v"><StatusMark :status="device.deviceStatus?.wifiConnected ? 'ok' : 'idle'" :label="device.deviceStatus?.wifiConnected ? 'yes' : 'no'" /></div>
             <div class="k">Sync server</div>
             <div class="v"><StatusMark :status="device.deviceStatus?.serverConfigured ? 'ok' : 'idle'" :label="device.deviceStatus?.serverConfigured ? 'configured' : 'not set'" /></div>
+            <template v-if="device.deviceStatus?.serverUrl">
+              <div class="k">Server URL</div>
+              <div class="v">{{ device.deviceStatus.serverUrl }}</div>
+              <div class="k">Device token</div>
+              <div class="v"><StatusMark :status="device.deviceStatus.serverHasToken ? 'ok' : 'idle'" :label="device.deviceStatus.serverHasToken ? 'set' : 'none'" /></div>
+            </template>
+            <div class="k">Timezone</div>
+            <div class="v">{{ formatUtcOffset(device.deviceStatus?.timezoneOffsetMinutes ?? 0) }}</div>
           </div>
         </Frame>
       </div>
@@ -291,7 +305,7 @@ const tzChoices = computed(() =>
               </select>
             </Field>
             <Field label="UTC offset (minutes)" :error="tzError ?? undefined">
-              <input v-model.number="tzOffset" type="number" step="15" min="-840" max="840" />
+              <input v-model.number="tzOffset" type="number" step="15" min="-720" max="840" />
               <div class="hint">{{ formatUtcOffset(tzOffset) }}</div>
             </Field>
           </div>
