@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Inkpaper Desktop",
+  "version": "0.1.0",
+  "identifier": "dev.inkpaper.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Inkpaper Desktop",
+        "width": 1180,
+        "height": 780,
+        "minWidth": 900,
+        "minHeight": 640,
+        "resizable": true,
+        "center": true
+      }
+    ],
+    "security": { "csp": null }
+  },
+  "bundle": { "active": false }
+}

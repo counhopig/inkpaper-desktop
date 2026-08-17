@@ -1,31 +1,78 @@
-mod app;
+//! Entry point. CLI dispatch happens first; everything else launches
+//! the Tauri window via `desktop::run`.
+
+mod commands;
+mod desktop;
+mod error;
 mod protocol;
 mod server;
+mod state;
 mod transport;
 
-/// `inkpaper-desktop --status <serial-port>`: headless USB status check,
+/// `inkpaper-desktop --status <serial-port> [timeout-seconds]`: headless USB status check,
 /// useful for verifying a connection without going through the GUI (e.g.
 /// scripting, or a machine with no display). Everything else launches the
 /// normal window.
-fn main() -> eframe::Result<()> {
+fn main() {
     let args: Vec<String> = std::env::args().collect();
-    if args.len() == 3 && args[1] == "--status" {
-        cli_status(&args[2]);
-        return Ok(());
+    if args.len() == 2 && args[1] == "--ble-scan" {
+        match transport::ble::BleLink::discover() {
+            Ok(true) => println!("Inkpaper BLE advertisement found"),
+            Ok(false) => println!("Inkpaper BLE advertisement not found"),
+            Err(err) => {
+                eprintln!("BLE scan failed: {err:#}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+    if args.len() == 2 && args[1] == "--ble-list" {
+        match transport::ble::BleLink::scan_report() {
+            Ok(report) if report.is_empty() => println!("No BLE advertisements received"),
+            Ok(report) => report.iter().for_each(|line| println!("{line}")),
+            Err(err) => {
+                eprintln!("BLE scan failed: {err:#}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+    if (args.len() == 3 || args.len() == 4) && args[1] == "--status" {
+        let timeout = args
+            .get(3)
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(35);
+        cli_usb_command(&args[2], timeout, CliAction::Status);
+        return;
+    }
+    if (args.len() == 3 || args.len() == 4) && args[1] == "--sync" {
+        let timeout = args
+            .get(3)
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(45);
+        cli_usb_command(&args[2], timeout, CliAction::Sync);
+        return;
     }
 
-    let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([720.0, 640.0]),
-        ..Default::default()
-    };
-    eframe::run_native(
-        "Inkpaper Desktop",
-        options,
-        Box::new(|_cc| Ok(Box::new(app::App::default()))),
-    )
+    desktop::run();
 }
 
-fn cli_status(port: &str) {
+#[derive(Clone, Copy)]
+enum CliAction {
+    Status,
+    Sync,
+}
+
+impl CliAction {
+    fn command(self) -> protocol::Command {
+        match self {
+            Self::Status => protocol::Command::GetStatus,
+            Self::Sync => protocol::Command::SyncNow,
+        }
+    }
+}
+
+fn cli_usb_command(port: &str, timeout_seconds: u64, action: CliAction) {
     use transport::usb::{UsbEvent, UsbLink};
 
     let link = match UsbLink::connect(port) {
@@ -35,14 +82,21 @@ fn cli_status(port: &str) {
             std::process::exit(1);
         }
     };
-    if let Err(err) = link.send(protocol::Command::GetStatus) {
+    if let Err(err) = link.send(action.command()) {
         eprintln!("send failed: {err}");
         std::process::exit(1);
     }
 
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    // Opening the ESP32-S3 USB Serial/JTAG port may reset the board. Boot can
+    // then spend about 25 seconds attempting Wi-Fi before the Home loop starts
+    // polling commands, so five seconds produces a misleading timeout.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout_seconds);
+    let mut next_send = std::time::Instant::now() + std::time::Duration::from_secs(2);
     while std::time::Instant::now() < deadline {
-        match link.event_rx.recv_timeout(std::time::Duration::from_millis(200)) {
+        match link
+            .event_rx
+            .recv_timeout(std::time::Duration::from_millis(200))
+        {
             Ok(UsbEvent::Reply(reply)) => {
                 println!("{reply:?}");
                 return;
@@ -52,7 +106,14 @@ fn cli_status(port: &str) {
                 eprintln!("disconnected: {reason}");
                 std::process::exit(1);
             }
-            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                if std::time::Instant::now() >= next_send {
+                    if let Err(err) = link.send(action.command()) {
+                        eprintln!("retry send failed: {err}");
+                    }
+                    next_send = std::time::Instant::now() + std::time::Duration::from_secs(2);
+                }
+            }
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
                 eprintln!("worker thread gone");
                 std::process::exit(1);

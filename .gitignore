@@ -1,1 +1,7 @@
 /target
+/dist
+/node_modules
+/gen
+
+# Keep old log entries in history but don't track new runtime logs.
+/logs/*.log
