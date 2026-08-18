@@ -216,6 +216,7 @@ const tzChoices = computed(() =>
             </template>
             <div class="k">Wi-Fi connected</div>
             <div class="v"><StatusMark :status="device.deviceStatus?.wifiConnected ? 'ok' : 'idle'" :label="device.deviceStatus?.wifiConnected ? 'yes' : 'no'" /></div>
+            <div v-if="!device.deviceStatus?.wifiConnected" class="hint">Connects on demand - only while syncing.</div>
             <div class="k">Sync server</div>
             <div class="v"><StatusMark :status="device.deviceStatus?.serverConfigured ? 'ok' : 'idle'" :label="device.deviceStatus?.serverConfigured ? 'configured' : 'not set'" /></div>
             <template v-if="device.deviceStatus?.serverUrl">
