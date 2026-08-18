@@ -226,9 +226,9 @@ fn clear_link(state: &AppState) {
 
 #[tauri::command]
 pub async fn list_usb_ports() -> Result<Vec<String>, AppError> {
-    Ok(tauri::async_runtime::spawn_blocking(crate::transport::usb::list_ports)
+    tauri::async_runtime::spawn_blocking(crate::transport::usb::list_ports)
         .await
-        .map_err(|e| AppError::internal(format!("list_usb_ports task: {e}")))?)
+        .map_err(|e| AppError::internal(format!("list_usb_ports task: {e}")))
 }
 
 #[tauri::command]

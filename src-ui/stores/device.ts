@@ -4,7 +4,7 @@
 
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { listen } from "@tauri-apps/api/event";
 import * as C from "../lib/commands";
 import type {
   ConnectionKind,
@@ -33,8 +33,6 @@ export const useDeviceStore = defineStore("device", () => {
   const lastResult = ref<DeviceCommandResult | null>(null);
   const ops = ref<Record<string, Operation>>({});
 
-  let unlistens: UnlistenFn[] = [];
-
   async function bootstrap() {
     // Initial state from Rust.
     const cs = await C.getConnectionState();
@@ -45,37 +43,28 @@ export const useDeviceStore = defineStore("device", () => {
     // crash the UI - it just means connection-changed feedback is
     // slower (we'll see it on the next explicit get_connection_state).
     try {
-      unlistens.push(
-        await listen<ConnectionStateInfo>("connection-changed", (e) => {
-          connection.value = e.payload;
-        }),
-      );
-      unlistens.push(
-        await listen<{ action: string; ok: boolean; error?: string }>(
-          "sync-finished",
-          (e) => {
-            const action = e.payload.action;
-            const key = `sync-${action}`;
-            if (e.payload.ok) {
-              ops.value[key] = { state: "success" };
-            } else {
-              ops.value[key] = {
-                state: "error",
-                errorCode: "SYNC_FAILED",
-                errorMessage: e.payload.error ?? "sync failed",
-              };
-            }
-          },
-        ),
+      await listen<ConnectionStateInfo>("connection-changed", (e) => {
+        connection.value = e.payload;
+      });
+      await listen<{ action: string; ok: boolean; error?: string }>(
+        "sync-finished",
+        (e) => {
+          const action = e.payload.action;
+          const key = `sync-${action}`;
+          if (e.payload.ok) {
+            ops.value[key] = { state: "success" };
+          } else {
+            ops.value[key] = {
+              state: "error",
+              errorCode: "SYNC_FAILED",
+              errorMessage: e.payload.error ?? "sync failed",
+            };
+          }
+        },
       );
     } catch {
       // ignore - Tauri may not be available in test envs
     }
-  }
-
-  function teardown() {
-    unlistens.forEach((u) => u());
-    unlistens = [];
   }
 
   async function refreshPorts() {
@@ -170,10 +159,6 @@ export const useDeviceStore = defineStore("device", () => {
     if (res.status) deviceStatus.value = res.status;
   }
 
-  function clearOp(key: string) {
-    delete ops.value[key];
-  }
-
   const isConnected = computed(() => connection.value.connected);
   const connectionKind = computed<ConnectionKind>(() => connection.value.kind);
 
@@ -187,7 +172,6 @@ export const useDeviceStore = defineStore("device", () => {
     isConnected,
     connectionKind,
     bootstrap,
-    teardown,
     refreshPorts,
     connectUsb,
     disconnect,
@@ -195,6 +179,5 @@ export const useDeviceStore = defineStore("device", () => {
     connectBle,
     run,
     setDeviceStatusFromCommand,
-    clearOp,
   };
 });

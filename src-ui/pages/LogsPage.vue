@@ -5,6 +5,7 @@ import Button from "../components/Button.vue";
 import { useLogsStore, type LogFilter } from "../stores/logs";
 import { formatTimeWithDate } from "../lib/format";
 import { openLogFolder, exportLog } from "../lib/commands";
+import type { LogEntry } from "../lib/types";
 
 const logs = useLogsStore();
 const scroller = ref<HTMLElement | null>(null);
@@ -61,7 +62,7 @@ async function doOpenFolder() {
   await openLogFolder();
 }
 
-function formatLine(e: { timestampMs: number; level: string; source: string; message: string }) {
+function formatLine(e: LogEntry) {
   return `[${formatTimeWithDate(e.timestampMs)}] ${e.level.toUpperCase()} ${e.source}: ${e.message}`;
 }
 

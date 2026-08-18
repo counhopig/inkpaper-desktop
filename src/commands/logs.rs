@@ -108,10 +108,6 @@ impl LogStore {
     pub fn warn(&self, source: &str, message: impl AsRef<str>) {
         self.append(LogLevel::Warn, source, message.as_ref());
     }
-    #[allow(dead_code)]
-    pub fn error(&self, source: &str, message: impl AsRef<str>) {
-        self.append(LogLevel::Error, source, message.as_ref());
-    }
 
     pub fn append(&self, level: LogLevel, source: &str, message: &str) {
         let timestamp_ms = SystemTime::now()
@@ -149,7 +145,7 @@ impl LogStore {
                     entry.source,
                     entry.message
                 );
-                let bytes = line.as_bytes().len();
+                let bytes = line.len();
                 if f.write_all(line.as_bytes()).is_ok() {
                     g.bytes_written += bytes as u64;
                 }

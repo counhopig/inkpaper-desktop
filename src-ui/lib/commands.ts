@@ -5,7 +5,6 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import type {
-  Alarm,
   AlarmInput,
   AppError,
   ConnectionStateInfo,
@@ -13,7 +12,6 @@ import type {
   Device,
   DeviceCommandResult,
   LogEntry,
-  Todo,
   TodoInput,
 } from "./types";
 
@@ -102,10 +100,6 @@ export async function deleteDevice(baseUrl: string, token: string, deviceId: num
   return wrap(invoke<null>("delete_device", { baseUrl, token, deviceId }));
 }
 
-export async function listAlarms(baseUrl: string, token: string, deviceId: number): Promise<Result<Alarm[]>> {
-  return wrap(invoke<Alarm[]>("list_alarms", { baseUrl, token, deviceId }));
-}
-
 export async function createAlarm(
   baseUrl: string,
   token: string,
@@ -136,10 +130,6 @@ export async function deleteAlarm(
 
 export async function clearAlarms(baseUrl: string, token: string, deviceId: number): Promise<Result<null>> {
   return wrap(invoke<null>("clear_alarms", { baseUrl, token, deviceId }));
-}
-
-export async function listTodos(baseUrl: string, token: string, deviceId: number): Promise<Result<Todo[]>> {
-  return wrap(invoke<Todo[]>("list_todos", { baseUrl, token, deviceId }));
 }
 
 export async function createTodo(

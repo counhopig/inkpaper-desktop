@@ -89,25 +89,6 @@ pub struct AlarmInput {
 }
 
 #[tauri::command]
-pub async fn list_alarms(
-    base_url: String,
-    token: String,
-    device_id: i64,
-    state: State<'_, SharedState>,
-) -> Result<Vec<Alarm>, AppError> {
-    state.logs.info(
-        "server",
-        format!("→ GET {base_url}/api/devices/{device_id}/alarms"),
-    );
-    tauri::async_runtime::spawn_blocking(move || -> Result<Vec<Alarm>, AppError> {
-        let c = client(base_url, token)?;
-        c.list_alarms(device_id).map_err(map_err)
-    })
-    .await
-    .map_err(|e| AppError::internal(format!("list_alarms task: {e}")))?
-}
-
-#[tauri::command]
 pub async fn create_alarm(
     base_url: String,
     token: String,
@@ -217,25 +198,6 @@ pub async fn clear_alarms(
 pub struct TodoInput {
     pub text: String,
     pub done: bool,
-}
-
-#[tauri::command]
-pub async fn list_todos(
-    base_url: String,
-    token: String,
-    device_id: i64,
-    state: State<'_, SharedState>,
-) -> Result<Vec<Todo>, AppError> {
-    state.logs.info(
-        "server",
-        format!("→ GET {base_url}/api/devices/{device_id}/todos"),
-    );
-    tauri::async_runtime::spawn_blocking(move || -> Result<Vec<Todo>, AppError> {
-        let c = client(base_url, token)?;
-        c.list_todos(device_id).map_err(map_err)
-    })
-    .await
-    .map_err(|e| AppError::internal(format!("list_todos task: {e}")))?
 }
 
 #[tauri::command]

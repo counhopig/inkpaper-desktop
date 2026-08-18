@@ -167,9 +167,6 @@ function formatAlarm(a: Alarm): string {
   return `${pad(a.hour)}:${pad(a.minute)}`;
 }
 
-function newDeviceRepeat(): RepeatKind {
-  return "Daily";
-}
 type RepeatKind = "Daily" | "Once";
 const newAlarmRepeatKind = ref<RepeatKind>("Daily");
 const newAlarmOnceDate = ref<string>("");

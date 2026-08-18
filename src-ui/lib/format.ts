@@ -47,13 +47,6 @@ export function tzLabel(name: string, offset: number): string {
   return `${name} · ${formatUtcOffset(offset)}`;
 }
 
-export function normaliseServerUrl(input: string): string {
-  const trimmed = input.trim();
-  if (!trimmed) return "";
-  const withScheme = trimmed.includes("://") ? trimmed : `http://${trimmed}`;
-  return withScheme.replace(/\/+$/, "");
-}
-
 export function redactSecret(value: string): string {
   const len = value.length;
   if (len <= 8) return "****";
@@ -70,16 +63,4 @@ export function formatTimeWithDate(ms: number): string {
   const d = new Date(ms);
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-}
-
-export function clampText(s: string, max: number): string {
-  if (s.length <= max) return s;
-  return `${s.slice(0, max - 1)}\u2026`;
-}
-
-export function isLikelyBaseUrl(s: string): boolean {
-  if (!s) return false;
-  // Either has a scheme, or is host:port / host form.
-  if (s.includes("://")) return true;
-  return /^[a-z0-9.-]+(:\d+)?(\/.*)?$/i.test(s);
 }

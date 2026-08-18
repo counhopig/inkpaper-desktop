@@ -25,7 +25,6 @@ use crate::transport::{
 pub struct AppState {
     pub link: Mutex<LinkState>,
     pub logs: LogStore,
-    #[allow(dead_code)]
     pub ctx: AppHandle,
 }
 

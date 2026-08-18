@@ -4,7 +4,7 @@
 
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { listen } from "@tauri-apps/api/event";
 import * as C from "../lib/commands";
 import type { LogEntry, LogLevel } from "../lib/types";
 
@@ -17,7 +17,6 @@ export const useLogsStore = defineStore("logs", () => {
   const paused = ref(false);
   const filePath = ref<string>("");
   const dirPath = ref<string>("");
-  let unlisten: UnlistenFn | null = null;
   let pending: LogEntry[] = [];
 
   function flushPending() {
@@ -34,7 +33,7 @@ export const useLogsStore = defineStore("logs", () => {
     const dp = await C.logDir();
     if (dp.ok) dirPath.value = dp.value;
     try {
-      unlisten = await listen<LogEntry>("device-log", (e) => {
+      await listen<LogEntry>("device-log", (e) => {
         pending.push(e.payload);
         if (!paused.value) {
           flushPending();
@@ -43,11 +42,6 @@ export const useLogsStore = defineStore("logs", () => {
     } catch {
       // ignore in non-Tauri environments
     }
-  }
-
-  function teardown() {
-    if (unlisten) unlisten();
-    unlisten = null;
   }
 
   async function clear() {
@@ -99,7 +93,6 @@ export const useLogsStore = defineStore("logs", () => {
     visibleEntries,
     summary,
     bootstrap,
-    teardown,
     clear,
     flush,
   };
