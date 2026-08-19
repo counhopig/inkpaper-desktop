@@ -14,9 +14,9 @@ A cross-platform (Linux / macOS / Windows) native app built with:
 
 ```mermaid
 flowchart LR
-    T[inkpaper-desktop] -->|USB serial / BLE| D[Zectrix Note 4]
-    T -->|HTTPS admin API| S[inkpaper-server]
-    D -->|HTTPS POST /api/sync| S
+    T["inkpaper-desktop"] -->|"USB serial / BLE"| D["Zectrix Note 4<br/>inkpaper-firmware"]
+    T -->|"HTTPS admin API"| S["inkpaper-server"]
+    D -->|"HTTPS POST /api/sync"| S
 ```
 
 It does **not** author content on the device. Four jobs:
