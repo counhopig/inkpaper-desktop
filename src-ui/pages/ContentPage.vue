@@ -7,7 +7,6 @@ import Notice from "../components/Notice.vue";
 import EmptyState from "../components/EmptyState.vue";
 import ConfirmDialog from "../components/ConfirmDialog.vue";
 import { useServerStore } from "../stores/server";
-import { redactSecret } from "../lib/format";
 import { validateAlarm, validateTodo, repeatLabel, isAlarmFormValid, isTodoFormValid } from "../lib/validation";
 import type { Alarm, AlarmInput, Importance, Todo, TodoDue, TodoInput } from "../lib/types";
 
@@ -274,14 +273,14 @@ function onOnceDateChange() {
       <div class="col-8">
         <Frame title="Server connection" subtitle="Admin token bearer auth">
           <div class="field-row">
-            <Field label="Server URL">
+            <Field label="Server URL" style="flex: 1.4;">
               <input
                 :value="server.baseUrl"
                 @input="(e) => server.setBaseUrl((e.target as HTMLInputElement).value)"
                 placeholder="http://192.168.1.10:8080"
               />
             </Field>
-            <Field label="Admin token" :hint="showServerToken ? '' : 'Stored in localStorage on this machine only.'">
+            <Field label="Admin token" hint="Stored in localStorage on this machine only.">
               <div class="row" style="gap: 0;">
                 <input
                   :value="server.adminToken"
@@ -295,16 +294,17 @@ function onOnceDateChange() {
                 </Button>
               </div>
             </Field>
-            <div class="row end" style="flex: 0 0 auto; align-self: end;">
-              <Button variant="primary" @click="connect">Connect &amp; list devices</Button>
-            </div>
+          </div>
+          <div class="row between" style="margin-top: var(--s-3);">
+            <StatusMark
+              :status="server.connected ? 'ok' : 'idle'"
+              :label="server.connected ? 'linked to server' : 'not linked'"
+            />
+            <Button variant="primary" @click="connect">Connect &amp; list devices</Button>
           </div>
           <Notice v-if="server.lastError" variant="error" :title="server.lastError.code">
             {{ server.lastError.message }}
           </Notice>
-          <div v-if="server.connected && server.adminToken" class="hint">
-            Token preview: {{ redactSecret(server.adminToken) }}
-          </div>
         </Frame>
       </div>
 
