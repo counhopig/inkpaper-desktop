@@ -1,7 +1,31 @@
+# macOS
+.DS_Store
+.AppleDouble
+
+# Rust / Cargo
 /target
-/dist
+**/*.rs.bk
+
+# Node / Vite / Tauri build output
 /node_modules
+/dist
 /gen
 
-# Keep old log entries in history but don't track new runtime logs.
+# Runtime logs (older entries stay in git history)
 /logs/*.log
+*.log
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Editor / IDE
+.vscode/
+.idea/
+*.iml
+*.swp
+*~
+
+# OS
+Thumbs.db

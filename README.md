@@ -1,26 +1,36 @@
 # Inkpaper Desktop
 
-PC configuration tool for the [Inkpaper NOTE4 firmware](../inkpaper) - a
-cross-platform (Linux/Windows/macOS) native app built with:
+PC configuration tool for the **Zectrix Note 4** e-ink device and the
+[**Inkpaper**](https://github.com/counhopig/inkpaper-firmware) ecosystem.
+A cross-platform (Linux / macOS / Windows) native app built with:
 
-- **Tauri 2** - native window, system menus, file dialogs, OS notifications
-- **Vue 3 + TypeScript** - the in-window UI (Composition API + Pinia)
-- **Rust** - device transport (USB serial, BLE), server admin HTTP,
-  command/event plumbing
+- **Tauri 2** — native window, system menus, file dialogs, notifications
+- **Vue 3 + TypeScript** — the in-window UI (Composition API + Pinia)
+- **Rust** — device transport (USB serial, BLE), server admin HTTP
 
-It does **not** author content. It has four jobs:
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/Rust-edition%202021-orange.svg)](Cargo.toml)
+[![Platform](https://img.shields.io/badge/Platform-Linux%2FmacOS%2FWindows-lightgrey.svg)]()
 
-- **Overview** - glanceable device + server state and setup progress.
-- **Device** - push Wi-Fi credentials, sync server URL + device token,
-  and timezone to the physical device over USB serial or BLE; trigger
-  a sync; check status. Talks the protocol documented in
-  [`../inkpaper/docs/control-protocol.md`](../inkpaper/docs/control-protocol.md).
-- **Content** - register devices and manage their alarms/todos against
-  [`inkpaper-server`](../inkpaper-server)'s admin API. This is where
-  actual content gets authored; the device just pulls it later over
-  Wi-Fi.
-- **Logs** - real-time diagnostics, mirrored to disk in the platform
-  log directory (see [Logging](#logging)).
+```mermaid
+flowchart LR
+    T[inkpaper-desktop] -->|USB serial / BLE| D[Zectrix Note 4]
+    T -->|HTTPS admin API| S[inkpaper-server]
+    D -->|HTTPS POST /api/sync| S
+```
+
+It does **not** author content on the device. Four jobs:
+
+- **Overview** — glanceable device + server state and setup progress.
+- **Device** — push Wi-Fi credentials, sync server URL + device token,
+  and timezone to the Note 4 over USB serial or BLE; trigger a sync; check
+  status. Talks the protocol in the firmware repo's
+  [`docs/control-protocol.md`](https://github.com/counhopig/inkpaper-firmware/blob/main/docs/control-protocol.md).
+- **Content** — register devices and manage their alarms/todos against
+  `inkpaper-server`'s admin API. This is where actual content gets
+  authored; the device just pulls it later over Wi-Fi.
+- **Logs** — real-time diagnostics, mirrored to disk (see
+  [Logging](#logging)).
 
 ## Repository layout
 
@@ -55,29 +65,16 @@ inkpaper-desktop/
 ## Develop
 
 ```bash
-# one-time
 npm install
-
-# full Tauri dev mode (hot-reloads Vue, rebuilds Rust on change)
-npm run tauri dev
+npm run tauri dev   # hot-reloads Vue, rebuilds Rust on change
 ```
 
-## Front-end checks
+## Front-end checks & Rust tests
 
 ```bash
 npm run build   # vue-tsc --noEmit && vite build
+cargo test      # wire format, URL normalisation, secret redaction
 ```
-
-## Rust tests
-
-```bash
-cargo test
-```
-
-Covers the JSON wire format, URL normalisation, secret redaction, and
-the `AppError` serialisation shape. The Vue side is currently
-type-checked only (no Vitest; tests would be added if the surface
-grows).
 
 ## Release build
 
@@ -85,73 +82,52 @@ grows).
 npm run tauri build
 ```
 
-Produces a signed `.app` bundle on macOS, an MSIX/`.exe` on Windows,
-and `.deb`/`.AppImage` on Linux (see Tauri's default bundler config).
+Produces a signed `.app` on macOS, MSIX/`.exe` on Windows, `.deb` /
+`.AppImage` on Linux.
 
 ## CLI
 
-The same binary runs as a headless tool for scripting. CLI arguments
-do **not** launch the Tauri window - they exit after one command:
+The same binary runs headless for scripting — CLI args never launch the
+Tauri window:
 
 ```bash
-inkpaper-desktop --ble-scan                        # true/false if Inkpaper advertises
+inkpaper-desktop --ble-scan                        # true/false if a Note 4 advertises
 inkpaper-desktop --ble-list                        # full btleplug peripheral dump
 inkpaper-desktop --status /dev/cu.usbmodem1101     # USB status (default timeout 35s)
-inkpaper-desktop --status /dev/cu.usbmodem1101 60  # custom timeout
 inkpaper-desktop --sync   /dev/cu.usbmodem1101     # USB sync (default timeout 45s)
-inkpaper-desktop --sync   /dev/cu.usbmodem1101 90  # custom timeout
 ```
 
 The ESP32-S3 USB Serial/JTAG port may reset the board on open, so
-status/sync timeouts are deliberately generous. Pass a longer timeout
-when scripting against a freshly booted board.
+timeouts are deliberately generous.
 
 ## macOS permissions
 
-The first time you run the GUI on macOS, the system will prompt for:
-
-- **Bluetooth** - required for BLE scanning/connection. Denying it
-  disables the BLE section of the Device page; USB continues to work.
-- **USB serial** - no special permission needed for the
-  `/dev/cu.usbmodem*` devices exposed by the ESP32-S3 USB
-  Serial/JTAG peripheral on most macOS versions. If a Corporate-managed
-  profile blocks raw USB access, run from a Terminal session that has
-  been granted the entitlement.
+First GUI run prompts for **Bluetooth** (needed for BLE; deny only
+disables BLE — USB still works). USB serial generally needs no extra
+permission.
 
 ## Design language
 
-Both the Desktop and the Server UI are intentionally built to feel like
-the e-ink screen of the device itself: paper-grey surfaces, ink-black
-rules, no large colour fills, no saturated accents, hierarchy carried
-by line weight and spacing rather than colour. Status is conveyed with
-glyphs (`○ ◉ △ ✓ ✕`) so meaning does not depend on hue. The design
-system is encoded in `src-ui/styles/tokens.css`; extending it means
-adding a new CSS variable there rather than scattering hex codes
-through components.
+Both the Desktop and the Server UI are built to feel like the device's
+own e-ink screen: paper-grey surfaces, ink-black rules, no saturated
+accents; hierarchy carried by line weight and spacing; status conveyed
+with glyphs (`○ ◉ △ ✓ ✕`). The system is encoded in
+`src-ui/styles/tokens.css`.
 
 ## Logging
 
-Logs are written to `inkpaper-desktop-<unix-epoch>.log` inside a
-platform data directory on every launch:
+Logs go to a platform data directory (outside the project tree, so
+`tauri dev`'s watcher doesn't loop):
 
-| OS      | Directory                                        |
-| ------- | ------------------------------------------------ |
-| macOS   | `~/Library/Logs/inkpaper-desktop/`               |
-| Windows | `%LOCALAPPDATA%\inkpaper-desktop\logs\`           |
-| Linux   | `~/.local/share/inkpaper-desktop/logs/`           |
+| OS      | Directory                                |
+| ------- | ---------------------------------------- |
+| macOS   | `~/Library/Logs/inkpaper-desktop/`       |
+| Windows | `%LOCALAPPDATA%\inkpaper-desktop\logs\`  |
+| Linux   | `~/.local/share/inkpaper-desktop/logs/`  |
 
-The directory is deliberately outside the project tree: `tauri dev`
-watches the project root, so a log file inside it would restart the
-app in an infinite loop as every flush touched the watched directory.
+Sensitive values (Wi-Fi passwords, admin/device tokens) are redacted on
+disk; USB/BLE command names, replies and error codes are logged verbatim.
 
-Sensitive values are redacted in the on-disk file (see `redact_secret`
-in `src/commands/logs.rs`):
+## License
 
-| Source            | Examples                                          |
-| ----------------- | ------------------------------------------------- |
-| Logged verbatim   | USB/BLE command names, replies, error codes       |
-| Redacted          | Wi-Fi passwords, Admin Tokens, Device Tokens      |
-
-The Logs page reads via the `device-log` Tauri event and never polls
-on a timer. "Open log folder" launches the OS file manager; "Export
-log" copies the current file into `~/Downloads/`.
+[Apache-2.0](LICENSE).
