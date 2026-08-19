@@ -12,9 +12,15 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+/// Recurrence schedule, mirroring `inkpaper-server`'s `models::Repeat`.
+/// Externally tagged: `"Daily"`, `{"Weekly": {"days": [...]}}`,
+/// `{"Monthly": {"days": [...]}}`, or `{"Once": {...}}`. Weekdays are
+/// 0=Sunday..6=Saturday; month days are 1..=31.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Repeat {
     Daily,
+    Weekly { days: Vec<u8> },
+    Monthly { days: Vec<u8> },
     Once { year: u16, month: u8, day: u8 },
 }
 
@@ -39,6 +45,7 @@ pub enum Importance {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct TodoDue {
+    pub year: u16,
     pub month: u8,
     pub day: u8,
 }
@@ -52,6 +59,8 @@ pub struct Todo {
     pub importance: Importance,
     #[serde(default)]
     pub due_date: Option<TodoDue>,
+    #[serde(default)]
+    pub repeat: Option<Repeat>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -79,6 +88,8 @@ pub struct UpsertTodoRequest {
     pub importance: Importance,
     #[serde(default)]
     pub due_date: Option<TodoDue>,
+    #[serde(default)]
+    pub repeat: Option<Repeat>,
 }
 
 #[derive(Clone)]

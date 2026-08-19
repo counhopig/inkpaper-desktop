@@ -203,6 +203,8 @@ pub struct TodoInput {
     pub importance: Importance,
     #[serde(default)]
     pub due_date: Option<TodoDue>,
+    #[serde(default)]
+    pub repeat: Option<Repeat>,
 }
 
 #[tauri::command]
@@ -228,6 +230,7 @@ pub async fn create_todo(
             done: input.done,
             importance: input.importance,
             due_date: input.due_date,
+            repeat: input.repeat,
         };
         c.create_todo(&device_id, &req).map_err(map_err)
     })
@@ -259,6 +262,7 @@ pub async fn update_todo(
             done: input.done,
             importance: input.importance,
             due_date: input.due_date,
+            repeat: input.repeat,
         };
         c.update_todo(&device_id, todo_id, &req).map_err(map_err)
     })

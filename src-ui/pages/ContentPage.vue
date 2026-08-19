@@ -7,8 +7,8 @@ import Notice from "../components/Notice.vue";
 import EmptyState from "../components/EmptyState.vue";
 import ConfirmDialog from "../components/ConfirmDialog.vue";
 import { useServerStore } from "../stores/server";
-import { validateAlarm, validateTodo, repeatLabel, isAlarmFormValid, isTodoFormValid } from "../lib/validation";
-import type { Alarm, AlarmInput, Importance, Todo, TodoDue, TodoInput } from "../lib/types";
+import { validateAlarm, validateTodo, isAlarmFormValid, isTodoFormValid } from "../lib/validation";
+import type { Alarm, AlarmInput, Importance, Repeat, Todo, TodoDue, TodoInput } from "../lib/types";
 
 const server = useServerStore();
 
@@ -27,8 +27,10 @@ const newAlarm = ref<AlarmInput>({
   enabled: true,
 });
 const editingAlarmId = ref<number | null>(null);
-const newTodo = ref<TodoInput>({ text: "", done: false, importance: "medium", dueDate: null });
+const newTodo = ref<TodoInput>({ text: "", done: false, importance: "medium", dueDate: null, repeat: null });
 const newTodoDueText = ref("");
+const newTodoRepeatKind = ref<"" | "Daily" | "Weekly" | "Monthly">("");
+const newTodoRepeatDays = ref("");
 const editingTodoId = ref<number | null>(null);
 
 const confirmClearAlarms = ref(false);
@@ -99,6 +101,7 @@ function startEditAlarm(a: Alarm) {
     repeat: a.repeat,
     enabled: a.enabled,
   };
+  applyRepeatToAlarmForm(a);
 }
 
 async function saveAlarm() {
@@ -128,18 +131,56 @@ async function doClearAlarms() {
 }
 
 function parseDueDate(raw: string): TodoDue | null {
-  const m = raw.trim().match(/^(\d{1,2})-(\d{1,2})$/);
+  const m = raw.trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (!m) return null;
-  const month = Number(m[1]);
-  const day = Number(m[2]);
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
   if (month < 1 || month > 12 || day < 1 || day > 31) return null;
-  return { month, day };
+  return { year, month, day };
 }
 
 function dueText(t: Todo | null): string {
   if (!t?.dueDate) return "";
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(t.dueDate.month)}-${pad(t.dueDate.day)}`;
+  return `${t.dueDate.year}-${pad(t.dueDate.month)}-${pad(t.dueDate.day)}`;
+}
+
+function buildRepeat(kind: string, daysRaw: string): Repeat | null {
+  if (kind === "Weekly" || kind === "Monthly") {
+    const days = daysRaw
+      .split(",")
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isFinite(n) && n >= 0 && n <= 31);
+    if (days.length === 0) return null;
+    return kind === "Weekly" ? { Weekly: { days } } : { Monthly: { days } };
+  }
+  if (kind === "Daily") return "Daily";
+  return null;
+}
+
+function repeatKindOf(r: Repeat | null): "" | "Daily" | "Weekly" | "Monthly" {
+  if (!r) return "";
+  if (r === "Daily") return "Daily";
+  if ("Weekly" in r) return "Weekly";
+  if ("Monthly" in r) return "Monthly";
+  return "";
+}
+
+function repeatDaysOf(r: Repeat | null): string {
+  if (!r || r === "Daily") return "";
+  if ("Weekly" in r) return r.Weekly.days.join(",");
+  if ("Monthly" in r) return r.Monthly.days.join(",");
+  return "";
+}
+
+function repeatLabel(r: Repeat | null): string {
+  if (!r) return "once";
+  if (r === "Daily") return "daily";
+  if ("Weekly" in r) return `weekly [${r.Weekly.days.map((d) => ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"][d]).join(",")}]`;
+  if ("Monthly" in r) return `monthly [${r.Monthly.days.join(",")}]`;
+  if ("Once" in r) return `once ${r.Once.year}-${String(r.Once.month).padStart(2, "0")}-${String(r.Once.day).padStart(2, "0")}`;
+  return "";
 }
 
 async function addTodo() {
@@ -149,20 +190,30 @@ async function addTodo() {
   if (due && !dueDate) {
     return;
   }
+  const repeat = buildRepeat(newTodoRepeatKind.value, newTodoRepeatDays.value);
   await server.createTodo({
     text: newTodo.value.text.trim(),
     done: false,
     importance: newTodo.value.importance,
     dueDate,
+    repeat,
   });
-  newTodo.value = { text: "", done: false, importance: "medium", dueDate: null };
+  resetTodoForm();
+}
+
+function resetTodoForm() {
+  newTodo.value = { text: "", done: false, importance: "medium", dueDate: null, repeat: null };
   newTodoDueText.value = "";
+  newTodoRepeatKind.value = "";
+  newTodoRepeatDays.value = "";
 }
 
 function startEditTodo(t: Todo) {
   editingTodoId.value = t.id;
-  newTodo.value = { text: t.text, done: t.done, importance: t.importance, dueDate: t.dueDate };
+  newTodo.value = { text: t.text, done: t.done, importance: t.importance, dueDate: t.dueDate, repeat: t.repeat };
   newTodoDueText.value = dueText(t);
+  newTodoRepeatKind.value = repeatKindOf(t.repeat);
+  newTodoRepeatDays.value = repeatDaysOf(t.repeat);
 }
 
 async function saveTodo() {
@@ -173,21 +224,21 @@ async function saveTodo() {
   if (due && !dueDate) {
     return;
   }
+  const repeat = buildRepeat(newTodoRepeatKind.value, newTodoRepeatDays.value);
   await server.updateTodo(editingTodoId.value, {
     text: newTodo.value.text.trim(),
     done: newTodo.value.done,
     importance: newTodo.value.importance,
     dueDate,
+    repeat,
   });
   editingTodoId.value = null;
-  newTodo.value = { text: "", done: false, importance: "medium", dueDate: null };
-  newTodoDueText.value = "";
+  resetTodoForm();
 }
 
 function cancelTodoEdit() {
   editingTodoId.value = null;
-  newTodo.value = { text: "", done: false, importance: "medium", dueDate: null };
-  newTodoDueText.value = "";
+  resetTodoForm();
 }
 
 async function toggleTodoDone(t: Todo) {
@@ -196,6 +247,7 @@ async function toggleTodoDone(t: Todo) {
     done: !t.done,
     importance: t.importance,
     dueDate: t.dueDate,
+    repeat: t.repeat,
   });
 }
 
@@ -221,13 +273,24 @@ function formatAlarm(a: Alarm): string {
   return `${pad(a.hour)}:${pad(a.minute)}`;
 }
 
-type RepeatKind = "Daily" | "Once";
+type RepeatKind = "Daily" | "Weekly" | "Monthly" | "Once";
 const newAlarmRepeatKind = ref<RepeatKind>("Daily");
+const newAlarmRepeatDays = ref("");
 const newAlarmOnceDate = ref<string>("");
 
 function syncRepeatKind() {
-  if (newAlarmRepeatKind.value === "Daily") {
+  const kind = newAlarmRepeatKind.value;
+  if (kind === "Daily") {
     newAlarm.value.repeat = "Daily";
+  } else if (kind === "Weekly" || kind === "Monthly") {
+    const days = newAlarmRepeatDays.value
+      .split(",")
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isFinite(n) && n >= 0 && n <= 31);
+    if (days.length > 0) {
+      newAlarm.value.repeat =
+        kind === "Weekly" ? { Weekly: { days } } : { Monthly: { days } };
+    }
   } else {
     const [y, m, d] = newAlarmOnceDate.value.split("-").map(Number);
     if (y && m && d) newAlarm.value.repeat = { Once: { year: y, month: m, day: d } };
@@ -236,8 +299,31 @@ function syncRepeatKind() {
 function onRepeatKindChange() {
   syncRepeatKind();
 }
+function onRepeatDaysChange() {
+  syncRepeatKind();
+}
 function onOnceDateChange() {
   syncRepeatKind();
+}
+
+function applyRepeatToAlarmForm(a: Alarm) {
+  newAlarmRepeatKind.value = "Daily";
+  newAlarmRepeatDays.value = "";
+  newAlarmOnceDate.value = "";
+  const r = a.repeat;
+  if (r === "Daily") {
+    newAlarmRepeatKind.value = "Daily";
+  } else if ("Weekly" in r) {
+    newAlarmRepeatKind.value = "Weekly";
+    newAlarmRepeatDays.value = r.Weekly.days.join(",");
+  } else if ("Monthly" in r) {
+    newAlarmRepeatKind.value = "Monthly";
+    newAlarmRepeatDays.value = r.Monthly.days.join(",");
+  } else {
+    newAlarmRepeatKind.value = "Once";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    newAlarmOnceDate.value = `${r.Once.year}-${pad(r.Once.month)}-${pad(r.Once.day)}`;
+  }
 }
 </script>
 
@@ -374,17 +460,28 @@ function onOnceDateChange() {
             <Field label="Repeat">
               <select v-model="newAlarmRepeatKind" @change="onRepeatKindChange">
                 <option value="Daily">Daily</option>
+                <option value="Weekly">Weekly</option>
+                <option value="Monthly">Monthly</option>
                 <option value="Once">Once</option>
               </select>
+            </Field>
+            <Field v-if="newAlarmRepeatKind === 'Weekly' || newAlarmRepeatKind === 'Monthly'" label="Days">
+              <input
+                v-model="newAlarmRepeatDays"
+                type="text"
+                :placeholder="newAlarmRepeatKind === 'Weekly' ? '0,2,4 (0=Sun)' : '1,15'"
+                style="width: 120px;"
+                @change="onRepeatDaysChange"
+              />
             </Field>
             <Field v-if="newAlarmRepeatKind === 'Once'" label="Date">
               <input v-model="newAlarmOnceDate" type="date" @change="onOnceDateChange" />
             </Field>
             <Field label="Enabled">
-              <label class="checkbox">
-                <input type="checkbox" v-model="newAlarm.enabled" />
-                {{ newAlarm.enabled ? "on" : "off" }}
-              </label>
+              <select v-model="newAlarm.enabled">
+                <option :value="true">On</option>
+                <option :value="false">Off</option>
+              </select>
             </Field>
             <div class="row end" style="flex: 0 0 auto;">
               <Button
@@ -444,7 +541,7 @@ function onOnceDateChange() {
           :title="server.selectedDevice ? `Todos · ${server.selectedDevice.name}` : 'Todos'"
           :subtitle="`${server.todoDoneCount} done · ${server.todoCount - server.todoDoneCount} pending`"
         >
-          <div class="row" style="align-items: flex-end; gap: var(--s-3);">
+          <div class="row wrap" style="align-items: flex-end; gap: var(--s-3);">
             <Field label="New todo" style="flex: 1; min-width: 240px;">
               <input v-model="newTodo.text" type="text" maxlength="200" placeholder="What needs doing?" />
             </Field>
@@ -455,8 +552,24 @@ function onOnceDateChange() {
                 <option value="high">High</option>
               </select>
             </Field>
-            <Field label="Due (MM-DD)">
-              <input v-model="newTodoDueText" type="text" maxlength="5" placeholder="—" style="width: 6ch;" />
+            <Field label="Due date">
+              <input v-model="newTodoDueText" type="date" style="width: 11ch;" />
+            </Field>
+            <Field label="Repeat">
+              <select v-model="newTodoRepeatKind">
+                <option value="">Once</option>
+                <option value="Daily">Daily</option>
+                <option value="Weekly">Weekly</option>
+                <option value="Monthly">Monthly</option>
+              </select>
+            </Field>
+            <Field v-if="newTodoRepeatKind === 'Weekly' || newTodoRepeatKind === 'Monthly'" label="Days">
+              <input
+                v-model="newTodoRepeatDays"
+                type="text"
+                :placeholder="newTodoRepeatKind === 'Weekly' ? '0,2,4 (0=Sun)' : '1,15'"
+                style="width: 100px;"
+              />
             </Field>
             <div class="row end">
               <Button
@@ -493,6 +606,7 @@ function onOnceDateChange() {
                 <div class="meta">
                   <span :class="['mark', importanceClass(t.importance)]">{{ importanceLabel(t.importance) }}</span>
                   <span v-if="t.dueDate">due {{ dueText(t) }}</span>
+                  <span v-if="t.repeat">· {{ repeatLabel(t.repeat) }}</span>
                   <span>· <span :class="['mark', t.done ? 'ok' : 'pending']">{{ t.done ? "done" : "pending" }}</span></span>
                 </div>
               </div>

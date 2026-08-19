@@ -2,8 +2,11 @@
 // camelCase because that's what serde produces via `#[serde(rename_all
 // = "camelCase")]` on every relevant struct/enum in src/.
 
+/** Weekdays are 0=Sunday..6=Saturday; month days are 1..=31. */
 export type Repeat =
   | "Daily"
+  | { Weekly: { days: number[] } }
+  | { Monthly: { days: number[] } }
   | { Once: { year: number; month: number; day: number } };
 
 export interface Alarm {
@@ -18,6 +21,7 @@ export interface Alarm {
 export type Importance = "low" | "medium" | "high";
 
 export interface TodoDue {
+  year: number;
   month: number;
   day: number;
 }
@@ -28,6 +32,7 @@ export interface Todo {
   done: boolean;
   importance: Importance;
   dueDate: TodoDue | null;
+  repeat: Repeat | null;
 }
 
 export interface Device {
@@ -90,6 +95,7 @@ export interface TodoInput {
   done: boolean;
   importance: Importance;
   dueDate: TodoDue | null;
+  repeat: Repeat | null;
 }
 
 export interface AppError {

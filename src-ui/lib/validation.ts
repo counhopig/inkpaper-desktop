@@ -73,6 +73,8 @@ export function isTodoFormValid(input: TodoInput): boolean {
 
 export function repeatLabel(repeat: Repeat): string {
   if (repeat === "Daily") return "Daily";
+  if ("Weekly" in repeat) return `Weekly · ${repeat.Weekly.days.join(",")}`;
+  if ("Monthly" in repeat) return `Monthly · ${repeat.Monthly.days.join(",")}`;
   const { year, month, day } = repeat.Once;
   const pad = (n: number) => String(n).padStart(2, "0");
   return `Once · ${year}-${pad(month)}-${pad(day)}`;
