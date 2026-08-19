@@ -553,7 +553,7 @@ function applyRepeatToAlarmForm(a: Alarm) {
               </select>
             </Field>
             <Field label="Due date">
-              <input v-model="newTodoDueText" type="date" style="width: 11ch;" />
+              <input v-model="newTodoDueText" type="date" style="width: 150px;" />
             </Field>
             <Field label="Repeat">
               <select v-model="newTodoRepeatKind">

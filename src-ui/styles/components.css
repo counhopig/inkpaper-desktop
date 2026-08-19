@@ -211,6 +211,18 @@
   line-height: 1.5;
 }
 
+/* Selects keep the platform's default chrome (taller hit area, different
+   padding, native arrow) unless reset; normalise them so they sit at the
+   exact same height/edge as the sibling inputs, with a quiet ink arrow. */
+.field select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: calc(var(--s-3) * 2 + 8px);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='9' height='6' viewBox='0 0 9 6'><path d='M0 0l4.5 6L9 0z' fill='%23666860'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right var(--s-3) center;
+}
+
 .field.invalid input,
 .field.invalid select,
 .field.invalid textarea {
