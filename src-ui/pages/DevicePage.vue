@@ -28,6 +28,8 @@ const device = useDeviceStore();
 const server = useServerStore();
 const refreshing = ref(false);
 
+const tab = ref<"connection" | "settings">("connection");
+
 const selectedPort = ref("");
 const ssid = ref("");
 const password = ref("");
@@ -162,7 +164,24 @@ const tzChoices = computed(() =>
       {{ device.ops.sync.errorMessage }}
     </Notice>
 
-    <div class="page-grid">
+    <div class="tabs" role="tablist">
+      <button
+        v-for="t in ([
+          { key: 'connection', label: 'Connection' },
+          { key: 'settings', label: 'Settings' },
+        ] as const)"
+        :key="t.key"
+        type="button"
+        role="tab"
+        :aria-selected="tab === t.key"
+        :class="['tab', { active: tab === t.key }]"
+        @click="tab = t.key"
+      >
+        {{ t.label }}
+      </button>
+    </div>
+
+    <section v-if="tab === 'connection'" class="page-grid">
       <div class="col-6">
         <Frame title="Connection" :subtitle="device.connection.kind">
           <div class="stack">
@@ -215,8 +234,10 @@ const tzChoices = computed(() =>
               <div class="v"><StatusMark :status="device.deviceStatus.wifiHasPassword ? 'ok' : 'idle'" :label="device.deviceStatus.wifiHasPassword ? 'set' : 'none'" /></div>
             </template>
             <div class="k">Wi-Fi connected</div>
-            <div class="v"><StatusMark :status="device.deviceStatus?.wifiConnected ? 'ok' : 'idle'" :label="device.deviceStatus?.wifiConnected ? 'yes' : 'no'" /></div>
-            <div v-if="!device.deviceStatus?.wifiConnected" class="hint">Connects on demand - only while syncing.</div>
+            <div class="v">
+              <StatusMark :status="device.deviceStatus?.wifiConnected ? 'ok' : 'idle'" :label="device.deviceStatus?.wifiConnected ? 'yes' : 'no'" />
+              <span v-if="!device.deviceStatus?.wifiConnected" class="inline-hint">connects on demand</span>
+            </div>
             <div class="k">Sync server</div>
             <div class="v"><StatusMark :status="device.deviceStatus?.serverConfigured ? 'ok' : 'idle'" :label="device.deviceStatus?.serverConfigured ? 'configured' : 'not set'" /></div>
             <template v-if="device.deviceStatus?.serverUrl">
@@ -230,7 +251,9 @@ const tzChoices = computed(() =>
           </div>
         </Frame>
       </div>
+    </section>
 
+    <section v-else class="page-grid">
       <div class="col-6">
         <Frame title="Wi-Fi" subtitle="Pushed to the device">
           <Field label="SSID" :error="ssidError ?? undefined">
@@ -351,6 +374,6 @@ const tzChoices = computed(() =>
           </template>
         </Frame>
       </div>
-    </div>
+    </section>
   </div>
 </template>

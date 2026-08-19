@@ -13,6 +13,8 @@ import type { Alarm, AlarmInput, Importance, Todo, TodoDue, TodoInput } from "..
 
 const server = useServerStore();
 
+const tab = ref<"connection" | "content">("connection");
+
 const newDeviceName = ref("");
 const registerError = ref<string | null>(null);
 const registeredToken = ref<string | null>(null);
@@ -251,7 +253,24 @@ function onOnceDateChange() {
       </div>
     </header>
 
-    <div class="page-grid">
+    <div class="tabs" role="tablist">
+      <button
+        v-for="t in ([
+          { key: 'connection', label: 'Connection' },
+          { key: 'content', label: 'Content' },
+        ] as const)"
+        :key="t.key"
+        type="button"
+        role="tab"
+        :aria-selected="tab === t.key"
+        :class="['tab', { active: tab === t.key }]"
+        @click="tab = t.key"
+      >
+        {{ t.label }}
+      </button>
+    </div>
+
+    <section v-if="tab === 'connection'" class="page-grid">
       <div class="col-8">
         <Frame title="Server connection" subtitle="Admin token bearer auth">
           <div class="field-row">
@@ -312,7 +331,7 @@ function onOnceDateChange() {
         </Frame>
       </div>
 
-      <div class="col-4">
+      <div class="col-12">
         <Frame title="Devices">
           <EmptyState v-if="server.devices.length === 0" glyph="·" title="No devices yet">
             Register a device on the right, then pick it below to manage its content.
@@ -334,8 +353,10 @@ function onOnceDateChange() {
           </div>
         </Frame>
       </div>
+    </section>
 
-      <div class="col-8">
+    <section v-else class="page-grid">
+      <div class="col-6">
         <Frame
           :title="server.selectedDevice ? `Alarms · ${server.selectedDevice.name}` : 'Alarms'"
           :subtitle="server.selectedDevice ? 'device content' : 'select a device'"
@@ -418,7 +439,7 @@ function onOnceDateChange() {
         </Frame>
       </div>
 
-      <div class="col-12">
+      <div class="col-6">
         <Frame
           :title="server.selectedDevice ? `Todos · ${server.selectedDevice.name}` : 'Todos'"
           :subtitle="`${server.todoDoneCount} done · ${server.todoCount - server.todoDoneCount} pending`"
@@ -492,7 +513,7 @@ function onOnceDateChange() {
           </div>
         </Frame>
       </div>
-    </div>
+    </section>
 
     <ConfirmDialog
       :open="confirmClearAlarms"
