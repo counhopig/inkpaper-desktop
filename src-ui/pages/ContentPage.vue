@@ -9,7 +9,7 @@ import ConfirmDialog from "../components/ConfirmDialog.vue";
 import { useServerStore } from "../stores/server";
 import { redactSecret } from "../lib/format";
 import { validateAlarm, validateTodo, repeatLabel, isAlarmFormValid, isTodoFormValid } from "../lib/validation";
-import type { Alarm, AlarmInput, Todo, TodoInput } from "../lib/types";
+import type { Alarm, AlarmInput, Importance, Todo, TodoDue, TodoInput } from "../lib/types";
 
 const server = useServerStore();
 
@@ -26,7 +26,8 @@ const newAlarm = ref<AlarmInput>({
   enabled: true,
 });
 const editingAlarmId = ref<number | null>(null);
-const newTodo = ref<TodoInput>({ text: "", done: false });
+const newTodo = ref<TodoInput>({ text: "", done: false, importance: "medium", dueDate: null });
+const newTodoDueText = ref("");
 const editingTodoId = ref<number | null>(null);
 
 const confirmClearAlarms = ref(false);
@@ -69,11 +70,11 @@ function copyRegisteredToken() {
   if (registeredToken.value) navigator.clipboard.writeText(registeredToken.value).catch(() => {});
 }
 
-async function unregister(id: number) {
+async function unregister(id: string) {
   await server.deleteDevice(id);
 }
 
-async function pick(id: number) {
+async function pick(id: string) {
   registeredToken.value = null;
   server.selectDevice(id);
   await server.refreshContent();
@@ -125,36 +126,88 @@ async function doClearAlarms() {
   confirmClearAlarms.value = false;
 }
 
+function parseDueDate(raw: string): TodoDue | null {
+  const m = raw.trim().match(/^(\d{1,2})-(\d{1,2})$/);
+  if (!m) return null;
+  const month = Number(m[1]);
+  const day = Number(m[2]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return { month, day };
+}
+
+function dueText(t: Todo | null): string {
+  if (!t?.dueDate) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(t.dueDate.month)}-${pad(t.dueDate.day)}`;
+}
+
 async function addTodo() {
   if (!isTodoFormValid(newTodo.value)) return;
-  await server.createTodo({ text: newTodo.value.text.trim(), done: false });
-  newTodo.value = { text: "", done: false };
+  const due = newTodoDueText.value.trim();
+  const dueDate = due ? parseDueDate(due) : null;
+  if (due && !dueDate) {
+    return;
+  }
+  await server.createTodo({
+    text: newTodo.value.text.trim(),
+    done: false,
+    importance: newTodo.value.importance,
+    dueDate,
+  });
+  newTodo.value = { text: "", done: false, importance: "medium", dueDate: null };
+  newTodoDueText.value = "";
 }
 
 function startEditTodo(t: Todo) {
   editingTodoId.value = t.id;
-  newTodo.value = { text: t.text, done: t.done };
+  newTodo.value = { text: t.text, done: t.done, importance: t.importance, dueDate: t.dueDate };
+  newTodoDueText.value = dueText(t);
 }
 
 async function saveTodo() {
   if (editingTodoId.value == null) return;
   if (!isTodoFormValid(newTodo.value)) return;
-  await server.updateTodo(editingTodoId.value, { text: newTodo.value.text.trim(), done: newTodo.value.done });
+  const due = newTodoDueText.value.trim();
+  const dueDate = due ? parseDueDate(due) : null;
+  if (due && !dueDate) {
+    return;
+  }
+  await server.updateTodo(editingTodoId.value, {
+    text: newTodo.value.text.trim(),
+    done: newTodo.value.done,
+    importance: newTodo.value.importance,
+    dueDate,
+  });
   editingTodoId.value = null;
-  newTodo.value = { text: "", done: false };
+  newTodo.value = { text: "", done: false, importance: "medium", dueDate: null };
+  newTodoDueText.value = "";
 }
 
 function cancelTodoEdit() {
   editingTodoId.value = null;
-  newTodo.value = { text: "", done: false };
+  newTodo.value = { text: "", done: false, importance: "medium", dueDate: null };
+  newTodoDueText.value = "";
 }
 
 async function toggleTodoDone(t: Todo) {
-  await server.updateTodo(t.id, { text: t.text, done: !t.done });
+  await server.updateTodo(t.id, {
+    text: t.text,
+    done: !t.done,
+    importance: t.importance,
+    dueDate: t.dueDate,
+  });
 }
 
 async function removeTodo(id: number) {
   await server.deleteTodo(id);
+}
+
+function importanceLabel(i: Importance): string {
+  return i === "high" ? "High" : i === "medium" ? "Med" : "Low";
+}
+
+function importanceClass(i: Importance): string {
+  return i === "high" ? "warn" : i === "medium" ? "pending" : "ok";
 }
 
 async function doClearTodos() {
@@ -273,7 +326,6 @@ function onOnceDateChange() {
             >
               <div class="body">
                 <div class="title">{{ d.name }}</div>
-                <div class="meta">#{{ d.id }}</div>
               </div>
               <div class="actions">
                 <Button size="small" variant="ghost" @click.stop="unregister(d.id)">Delete</Button>
@@ -286,7 +338,7 @@ function onOnceDateChange() {
       <div class="col-8">
         <Frame
           :title="server.selectedDevice ? `Alarms · ${server.selectedDevice.name}` : 'Alarms'"
-          :subtitle="server.selectedDevice ? `#${server.selectedDevice.id}` : 'select a device'"
+          :subtitle="server.selectedDevice ? 'device content' : 'select a device'"
         >
           <div class="row" style="align-items: flex-end; flex-wrap: wrap; gap: var(--s-3);">
             <Field label="Hour">
@@ -375,6 +427,16 @@ function onOnceDateChange() {
             <Field label="New todo" style="flex: 1; min-width: 240px;">
               <input v-model="newTodo.text" type="text" maxlength="200" placeholder="What needs doing?" />
             </Field>
+            <Field label="Importance">
+              <select v-model="newTodo.importance">
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </Field>
+            <Field label="Due (MM-DD)">
+              <input v-model="newTodoDueText" type="text" maxlength="5" placeholder="—" style="width: 6ch;" />
+            </Field>
             <div class="row end">
               <Button
                 v-if="editingTodoId == null"
@@ -407,7 +469,11 @@ function onOnceDateChange() {
                     </span>
                   </label>
                 </div>
-                <div class="meta">#{{ t.id }} · <span :class="['mark', t.done ? 'ok' : 'pending']">{{ t.done ? "done" : "pending" }}</span></div>
+                <div class="meta">
+                  <span :class="['mark', importanceClass(t.importance)]">{{ importanceLabel(t.importance) }}</span>
+                  <span v-if="t.dueDate">due {{ dueText(t) }}</span>
+                  <span>· <span :class="['mark', t.done ? 'ok' : 'pending']">{{ t.done ? "done" : "pending" }}</span></span>
+                </div>
               </div>
               <div class="actions">
                 <Button size="small" variant="ghost" @click="startEditTodo(t)">Edit</Button>

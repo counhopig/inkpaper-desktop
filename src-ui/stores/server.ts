@@ -22,7 +22,7 @@ export const useServerStore = defineStore("server", () => {
   const lastError = ref<{ code: string; message: string } | null>(null);
 
   const devices = ref<Device[]>([]);
-  const selectedDeviceId = ref<number | null>(loadSelectedDeviceId());
+  const selectedDeviceId = ref<string | null>(loadSelectedDeviceId());
   const alarms = ref<Alarm[]>([]);
   const todos = ref<Todo[]>([]);
 
@@ -38,7 +38,7 @@ export const useServerStore = defineStore("server", () => {
     connected.value = false;
   }
 
-  function selectDevice(id: number | null) {
+  function selectDevice(id: string | null) {
     selectedDeviceId.value = id;
     saveSelectedDeviceId(id);
     alarms.value = [];
@@ -84,7 +84,7 @@ export const useServerStore = defineStore("server", () => {
     return r;
   }
 
-  async function deleteDevice(id: number) {
+  async function deleteDevice(id: string) {
     const r = await C.deleteDevice(baseUrl.value, adminToken.value, id);
     if (r.ok) {
       devices.value = devices.value.filter((d) => d.id !== id);

@@ -160,7 +160,7 @@ const recent = computed(() => logs.entries.slice(-12).reverse());
               <StatusMark :status="server.connected ? 'ok' : 'idle'" :label="server.connected ? 'linked' : 'not linked'" />
             </div>
             <div class="k">Selected device</div>
-            <div class="v">{{ server.selectedDevice ? `${server.selectedDevice.name} (#${server.selectedDevice.id})` : "—" }}</div>
+            <div class="v">{{ server.selectedDevice ? `${server.selectedDevice.name}` : "—" }}</div>
             <div class="k">Alarms</div>
             <div class="v">{{ server.alarmCount }}</div>
             <div class="k">Todos</div>

@@ -28,16 +28,36 @@ pub struct Alarm {
     pub label: String,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Importance {
+    Low,
+    #[default]
+    Medium,
+    High,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct TodoDue {
+    pub month: u8,
+    pub day: u8,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Todo {
     pub id: u8,
     pub text: String,
     pub done: bool,
+    #[serde(default)]
+    pub importance: Importance,
+    #[serde(default)]
+    pub due_date: Option<TodoDue>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Device {
-    pub id: i64,
+    /// UUID string, opaque - not a sequential number.
+    pub id: String,
     pub name: String,
     pub token: Option<String>,
 }
@@ -55,6 +75,10 @@ pub struct UpsertAlarmRequest {
 pub struct UpsertTodoRequest {
     pub text: String,
     pub done: bool,
+    #[serde(default)]
+    pub importance: Importance,
+    #[serde(default)]
+    pub due_date: Option<TodoDue>,
 }
 
 #[derive(Clone)]
@@ -101,14 +125,14 @@ impl ServerClient {
         Ok(resp.json()?)
     }
 
-    pub fn delete_device(&self, id: i64) -> anyhow::Result<()> {
+    pub fn delete_device(&self, id: &str) -> anyhow::Result<()> {
         self.auth(self.client.delete(self.url(&format!("/api/devices/{id}"))))
             .send()?
             .error_for_status()?;
         Ok(())
     }
 
-    pub fn list_alarms(&self, device_id: i64) -> anyhow::Result<Vec<Alarm>> {
+    pub fn list_alarms(&self, device_id: &str) -> anyhow::Result<Vec<Alarm>> {
         let resp = self
             .auth(
                 self.client
@@ -119,7 +143,7 @@ impl ServerClient {
         Ok(resp.json()?)
     }
 
-    pub fn create_alarm(&self, device_id: i64, req: &UpsertAlarmRequest) -> anyhow::Result<()> {
+    pub fn create_alarm(&self, device_id: &str, req: &UpsertAlarmRequest) -> anyhow::Result<()> {
         self.auth(
             self.client
                 .post(self.url(&format!("/api/devices/{device_id}/alarms"))),
@@ -132,7 +156,7 @@ impl ServerClient {
 
     pub fn update_alarm(
         &self,
-        device_id: i64,
+        device_id: &str,
         alarm_id: u8,
         req: &UpsertAlarmRequest,
     ) -> anyhow::Result<()> {
@@ -146,7 +170,7 @@ impl ServerClient {
         Ok(())
     }
 
-    pub fn delete_alarm(&self, device_id: i64, alarm_id: u8) -> anyhow::Result<()> {
+    pub fn delete_alarm(&self, device_id: &str, alarm_id: u8) -> anyhow::Result<()> {
         self.auth(
             self.client
                 .delete(self.url(&format!("/api/devices/{device_id}/alarms/{alarm_id}"))),
@@ -156,7 +180,7 @@ impl ServerClient {
         Ok(())
     }
 
-    pub fn clear_alarms(&self, device_id: i64) -> anyhow::Result<()> {
+    pub fn clear_alarms(&self, device_id: &str) -> anyhow::Result<()> {
         self.auth(
             self.client
                 .delete(self.url(&format!("/api/devices/{device_id}/alarms"))),
@@ -166,7 +190,7 @@ impl ServerClient {
         Ok(())
     }
 
-    pub fn list_todos(&self, device_id: i64) -> anyhow::Result<Vec<Todo>> {
+    pub fn list_todos(&self, device_id: &str) -> anyhow::Result<Vec<Todo>> {
         let resp = self
             .auth(
                 self.client
@@ -177,7 +201,7 @@ impl ServerClient {
         Ok(resp.json()?)
     }
 
-    pub fn create_todo(&self, device_id: i64, req: &UpsertTodoRequest) -> anyhow::Result<()> {
+    pub fn create_todo(&self, device_id: &str, req: &UpsertTodoRequest) -> anyhow::Result<()> {
         self.auth(
             self.client
                 .post(self.url(&format!("/api/devices/{device_id}/todos"))),
@@ -190,7 +214,7 @@ impl ServerClient {
 
     pub fn update_todo(
         &self,
-        device_id: i64,
+        device_id: &str,
         todo_id: u8,
         req: &UpsertTodoRequest,
     ) -> anyhow::Result<()> {
@@ -204,7 +228,7 @@ impl ServerClient {
         Ok(())
     }
 
-    pub fn delete_todo(&self, device_id: i64, todo_id: u8) -> anyhow::Result<()> {
+    pub fn delete_todo(&self, device_id: &str, todo_id: u8) -> anyhow::Result<()> {
         self.auth(
             self.client
                 .delete(self.url(&format!("/api/devices/{device_id}/todos/{todo_id}"))),
@@ -214,7 +238,7 @@ impl ServerClient {
         Ok(())
     }
 
-    pub fn clear_todos(&self, device_id: i64) -> anyhow::Result<()> {
+    pub fn clear_todos(&self, device_id: &str) -> anyhow::Result<()> {
         self.auth(
             self.client
                 .delete(self.url(&format!("/api/devices/{device_id}/todos"))),

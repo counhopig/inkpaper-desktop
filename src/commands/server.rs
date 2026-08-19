@@ -12,7 +12,8 @@ use tauri::State;
 use crate::desktop::SharedState;
 use crate::error::{from_reqwest, AppError};
 use crate::server::{
-    Alarm, Device, Repeat, ServerClient, Todo, UpsertAlarmRequest, UpsertTodoRequest,
+    Alarm, Device, Importance, Repeat, ServerClient, Todo, TodoDue, UpsertAlarmRequest,
+    UpsertTodoRequest,
 };
 
 fn client(base_url: String, token: String) -> Result<ServerClient, AppError> {
@@ -62,7 +63,7 @@ pub async fn register_device(
 pub async fn delete_device(
     base_url: String,
     token: String,
-    device_id: i64,
+    device_id: String,
     state: State<'_, SharedState>,
 ) -> Result<(), AppError> {
     state
@@ -70,7 +71,7 @@ pub async fn delete_device(
         .info("server", format!("→ DELETE {base_url}/api/devices/{device_id}"));
     tauri::async_runtime::spawn_blocking(move || -> Result<(), AppError> {
         let c = client(base_url, token)?;
-        c.delete_device(device_id).map_err(map_err)
+        c.delete_device(&device_id).map_err(map_err)
     })
     .await
     .map_err(|e| AppError::internal(format!("delete_device task: {e}")))?
@@ -92,7 +93,7 @@ pub struct AlarmInput {
 pub async fn create_alarm(
     base_url: String,
     token: String,
-    device_id: i64,
+    device_id: String,
     input: AlarmInput,
     state: State<'_, SharedState>,
 ) -> Result<(), AppError> {
@@ -113,7 +114,7 @@ pub async fn create_alarm(
             repeat: input.repeat,
             enabled: input.enabled,
         };
-        c.create_alarm(device_id, &req).map_err(map_err)
+        c.create_alarm(&device_id, &req).map_err(map_err)
     })
     .await
     .map_err(|e| AppError::internal(format!("create_alarm task: {e}")))?
@@ -123,7 +124,7 @@ pub async fn create_alarm(
 pub async fn update_alarm(
     base_url: String,
     token: String,
-    device_id: i64,
+    device_id: String,
     alarm_id: u8,
     input: AlarmInput,
     state: State<'_, SharedState>,
@@ -145,7 +146,7 @@ pub async fn update_alarm(
             repeat: input.repeat,
             enabled: input.enabled,
         };
-        c.update_alarm(device_id, alarm_id, &req)
+        c.update_alarm(&device_id, alarm_id, &req)
             .map_err(map_err)
     })
     .await
@@ -156,7 +157,7 @@ pub async fn update_alarm(
 pub async fn delete_alarm(
     base_url: String,
     token: String,
-    device_id: i64,
+    device_id: String,
     alarm_id: u8,
     state: State<'_, SharedState>,
 ) -> Result<(), AppError> {
@@ -166,7 +167,7 @@ pub async fn delete_alarm(
     );
     tauri::async_runtime::spawn_blocking(move || -> Result<(), AppError> {
         let c = client(base_url, token)?;
-        c.delete_alarm(device_id, alarm_id).map_err(map_err)
+        c.delete_alarm(&device_id, alarm_id).map_err(map_err)
     })
     .await
     .map_err(|e| AppError::internal(format!("delete_alarm task: {e}")))?
@@ -176,7 +177,7 @@ pub async fn delete_alarm(
 pub async fn clear_alarms(
     base_url: String,
     token: String,
-    device_id: i64,
+    device_id: String,
     state: State<'_, SharedState>,
 ) -> Result<(), AppError> {
     state.logs.warn(
@@ -185,7 +186,7 @@ pub async fn clear_alarms(
     );
     tauri::async_runtime::spawn_blocking(move || -> Result<(), AppError> {
         let c = client(base_url, token)?;
-        c.clear_alarms(device_id).map_err(map_err)
+        c.clear_alarms(&device_id).map_err(map_err)
     })
     .await
     .map_err(|e| AppError::internal(format!("clear_alarms task: {e}")))?
@@ -198,13 +199,17 @@ pub async fn clear_alarms(
 pub struct TodoInput {
     pub text: String,
     pub done: bool,
+    #[serde(default)]
+    pub importance: Importance,
+    #[serde(default)]
+    pub due_date: Option<TodoDue>,
 }
 
 #[tauri::command]
 pub async fn create_todo(
     base_url: String,
     token: String,
-    device_id: i64,
+    device_id: String,
     input: TodoInput,
     state: State<'_, SharedState>,
 ) -> Result<(), AppError> {
@@ -221,8 +226,10 @@ pub async fn create_todo(
         let req = UpsertTodoRequest {
             text: input.text,
             done: input.done,
+            importance: input.importance,
+            due_date: input.due_date,
         };
-        c.create_todo(device_id, &req).map_err(map_err)
+        c.create_todo(&device_id, &req).map_err(map_err)
     })
     .await
     .map_err(|e| AppError::internal(format!("create_todo task: {e}")))?
@@ -232,7 +239,7 @@ pub async fn create_todo(
 pub async fn update_todo(
     base_url: String,
     token: String,
-    device_id: i64,
+    device_id: String,
     todo_id: u8,
     input: TodoInput,
     state: State<'_, SharedState>,
@@ -250,8 +257,10 @@ pub async fn update_todo(
         let req = UpsertTodoRequest {
             text: input.text,
             done: input.done,
+            importance: input.importance,
+            due_date: input.due_date,
         };
-        c.update_todo(device_id, todo_id, &req).map_err(map_err)
+        c.update_todo(&device_id, todo_id, &req).map_err(map_err)
     })
     .await
     .map_err(|e| AppError::internal(format!("update_todo task: {e}")))?
@@ -261,7 +270,7 @@ pub async fn update_todo(
 pub async fn delete_todo(
     base_url: String,
     token: String,
-    device_id: i64,
+    device_id: String,
     todo_id: u8,
     state: State<'_, SharedState>,
 ) -> Result<(), AppError> {
@@ -271,7 +280,7 @@ pub async fn delete_todo(
     );
     tauri::async_runtime::spawn_blocking(move || -> Result<(), AppError> {
         let c = client(base_url, token)?;
-        c.delete_todo(device_id, todo_id).map_err(map_err)
+        c.delete_todo(&device_id, todo_id).map_err(map_err)
     })
     .await
     .map_err(|e| AppError::internal(format!("delete_todo task: {e}")))?
@@ -281,7 +290,7 @@ pub async fn delete_todo(
 pub async fn clear_todos(
     base_url: String,
     token: String,
-    device_id: i64,
+    device_id: String,
     state: State<'_, SharedState>,
 ) -> Result<(), AppError> {
     state.logs.warn(
@@ -290,7 +299,7 @@ pub async fn clear_todos(
     );
     tauri::async_runtime::spawn_blocking(move || -> Result<(), AppError> {
         let c = client(base_url, token)?;
-        c.clear_todos(device_id).map_err(map_err)
+        c.clear_todos(&device_id).map_err(map_err)
     })
     .await
     .map_err(|e| AppError::internal(format!("clear_todos task: {e}")))?
@@ -307,7 +316,7 @@ pub struct ContentSnapshot {
 pub async fn list_content(
     base_url: String,
     token: String,
-    device_id: i64,
+    device_id: String,
     state: State<'_, SharedState>,
 ) -> Result<ContentSnapshot, AppError> {
     state.logs.info(
@@ -316,8 +325,8 @@ pub async fn list_content(
     );
     tauri::async_runtime::spawn_blocking(move || -> Result<ContentSnapshot, AppError> {
         let c = client(base_url, token)?;
-        let alarms = c.list_alarms(device_id).map_err(map_err)?;
-        let todos = c.list_todos(device_id).map_err(map_err)?;
+        let alarms = c.list_alarms(&device_id).map_err(map_err)?;
+        let todos = c.list_todos(&device_id).map_err(map_err)?;
         Ok(ContentSnapshot { alarms, todos })
     })
     .await

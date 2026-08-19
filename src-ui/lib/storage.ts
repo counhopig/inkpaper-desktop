@@ -24,14 +24,15 @@ export function saveAdminToken(value: string): void {
   else localStorage.removeItem(KEY_ADMIN_TOKEN);
 }
 
-export function loadSelectedDeviceId(): number | null {
+export function loadSelectedDeviceId(): string | null {
   const raw = localStorage.getItem(KEY_SELECTED_DEVICE);
   if (!raw) return null;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : null;
+  // Device ids are now UUID strings; a leftover numeric id from before
+  // the UUID migration can never match a real device, so drop it.
+  return raw.trim() ? raw : null;
 }
 
-export function saveSelectedDeviceId(id: number | null): void {
+export function saveSelectedDeviceId(id: string | null): void {
   if (id == null) localStorage.removeItem(KEY_SELECTED_DEVICE);
-  else localStorage.setItem(KEY_SELECTED_DEVICE, String(id));
+  else localStorage.setItem(KEY_SELECTED_DEVICE, id);
 }

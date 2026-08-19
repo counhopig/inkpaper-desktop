@@ -96,14 +96,14 @@ export async function registerDevice(baseUrl: string, token: string, name: strin
   return wrap(invoke<Device>("register_device", { baseUrl, token, name }));
 }
 
-export async function deleteDevice(baseUrl: string, token: string, deviceId: number): Promise<Result<null>> {
+export async function deleteDevice(baseUrl: string, token: string, deviceId: string): Promise<Result<null>> {
   return wrap(invoke<null>("delete_device", { baseUrl, token, deviceId }));
 }
 
 export async function createAlarm(
   baseUrl: string,
   token: string,
-  deviceId: number,
+  deviceId: string,
   input: AlarmInput,
 ): Promise<Result<null>> {
   return wrap(invoke<null>("create_alarm", { baseUrl, token, deviceId, input }));
@@ -112,7 +112,7 @@ export async function createAlarm(
 export async function updateAlarm(
   baseUrl: string,
   token: string,
-  deviceId: number,
+  deviceId: string,
   alarmId: number,
   input: AlarmInput,
 ): Promise<Result<null>> {
@@ -122,20 +122,20 @@ export async function updateAlarm(
 export async function deleteAlarm(
   baseUrl: string,
   token: string,
-  deviceId: number,
+  deviceId: string,
   alarmId: number,
 ): Promise<Result<null>> {
   return wrap(invoke<null>("delete_alarm", { baseUrl, token, deviceId, alarmId }));
 }
 
-export async function clearAlarms(baseUrl: string, token: string, deviceId: number): Promise<Result<null>> {
+export async function clearAlarms(baseUrl: string, token: string, deviceId: string): Promise<Result<null>> {
   return wrap(invoke<null>("clear_alarms", { baseUrl, token, deviceId }));
 }
 
 export async function createTodo(
   baseUrl: string,
   token: string,
-  deviceId: number,
+  deviceId: string,
   input: TodoInput,
 ): Promise<Result<null>> {
   return wrap(invoke<null>("create_todo", { baseUrl, token, deviceId, input }));
@@ -144,7 +144,7 @@ export async function createTodo(
 export async function updateTodo(
   baseUrl: string,
   token: string,
-  deviceId: number,
+  deviceId: string,
   todoId: number,
   input: TodoInput,
 ): Promise<Result<null>> {
@@ -154,17 +154,17 @@ export async function updateTodo(
 export async function deleteTodo(
   baseUrl: string,
   token: string,
-  deviceId: number,
+  deviceId: string,
   todoId: number,
 ): Promise<Result<null>> {
   return wrap(invoke<null>("delete_todo", { baseUrl, token, deviceId, todoId }));
 }
 
-export async function clearTodos(baseUrl: string, token: string, deviceId: number): Promise<Result<null>> {
+export async function clearTodos(baseUrl: string, token: string, deviceId: string): Promise<Result<null>> {
   return wrap(invoke<null>("clear_todos", { baseUrl, token, deviceId }));
 }
 
-export async function listContent(baseUrl: string, token: string, deviceId: number): Promise<Result<ContentSnapshot>> {
+export async function listContent(baseUrl: string, token: string, deviceId: string): Promise<Result<ContentSnapshot>> {
   return wrap(invoke<ContentSnapshot>("list_content", { baseUrl, token, deviceId }));
 }
 

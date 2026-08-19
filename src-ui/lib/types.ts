@@ -15,14 +15,24 @@ export interface Alarm {
   label: string;
 }
 
+export type Importance = "low" | "medium" | "high";
+
+export interface TodoDue {
+  month: number;
+  day: number;
+}
+
 export interface Todo {
   id: number;
   text: string;
   done: boolean;
+  importance: Importance;
+  dueDate: TodoDue | null;
 }
 
 export interface Device {
-  id: number;
+  /** UUID string, opaque - not displayed in the UI. */
+  id: string;
   name: string;
   /** Only present on the response of `register_device`. */
   token?: string | null;
@@ -78,6 +88,8 @@ export interface AlarmInput {
 export interface TodoInput {
   text: string;
   done: boolean;
+  importance: Importance;
+  dueDate: TodoDue | null;
 }
 
 export interface AppError {
