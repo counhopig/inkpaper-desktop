@@ -265,7 +265,7 @@ mod live_server_tests {
     use super::*;
     use std::time::Duration;
 
-    const LIVE_URL: &str = "http://192.168.31.29:8080";
+    const LIVE_URL: &str = "http://192.168.1.10:8080";
 
     fn reachable() -> bool {
         let probe = reqwest::blocking::Client::builder()
