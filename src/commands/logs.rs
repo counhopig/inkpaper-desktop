@@ -59,7 +59,7 @@ pub enum LogLevel {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LogEntry {
-    pub timestamp_ms: u128,
+    pub timestamp_ms: u64,
     pub level: LogLevel,
     pub source: String,
     pub message: String,
@@ -112,7 +112,7 @@ impl LogStore {
     pub fn append(&self, level: LogLevel, source: &str, message: &str) {
         let timestamp_ms = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_millis())
+            .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
         let entry = LogEntry {
             timestamp_ms,
