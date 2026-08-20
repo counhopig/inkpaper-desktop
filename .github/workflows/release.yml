@@ -39,6 +39,7 @@ jobs:
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
+            libudev-dev \
             patchelf
 
       - name: Install front-end deps
@@ -52,5 +53,5 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "Inkpaper Desktop ${{ github.ref_name }}"
           releaseBody: "Desktop configuration tool for the Zectrix Note 4 e-ink device."
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
