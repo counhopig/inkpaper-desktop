@@ -25,6 +25,8 @@
   --line-soft: #c7c6bd;
   --line-faint: #d6d4ca;
   --line-dashed: #6f6f66;
+  --grid-line: rgba(21, 22, 18, 0.04);
+  --grid-line-strong: rgba(21, 22, 18, 0.07);
 
   /* Semantic: still monochrome on purpose. Differentiated by glyph and weight. */
   --danger: #151612;

@@ -33,14 +33,25 @@ body {
   line-height: 1.5;
   color: var(--ink);
   background-color: var(--paper);
-  /* Faint paper grain. Two soft radial gradients avoid the artificial
-     "tartan noise" look of repeating SVG, while still adding tactile
-     texture to the paper background. */
+  /* The window reads as a single sheet of drafting paper: a faint 24px
+     coordinate grid underneath the existing tactile paper grain. The grid
+     is what an engineer would draw a device schematic on - it frames the
+     e-ink gadget this tool configures. */
   background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
     radial-gradient(circle at 25% 35%, rgba(20, 22, 18, 0.016) 0 1px, transparent 2px),
     radial-gradient(circle at 75% 65%, rgba(20, 22, 18, 0.013) 0 1px, transparent 2px);
-  background-size: 9px 9px, 13px 13px;
-  background-position: 0 0, 3px 4px;
+  background-size:
+    24px 24px,
+    24px 24px,
+    9px 9px,
+    13px 13px;
+  background-position:
+    0 0,
+    0 0,
+    0 0,
+    3px 4px;
   user-select: none;
   -webkit-user-select: none;
   cursor: default;
@@ -128,3 +139,14 @@ a {
 .glyph-idle::before { content: "○"; }
 .glyph-warn::before { content: "△"; }
 .glyph-fail::before { content: "✕"; }
+
+/* Honour users who ask for less motion: collapse every animation. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

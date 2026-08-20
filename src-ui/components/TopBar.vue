@@ -17,6 +17,14 @@ const now = computed(() =>
   new Date(nowMs.value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
 );
 
+const date = computed(() =>
+  new Date(nowMs.value).toLocaleDateString([], {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }),
+);
+
 const deviceGlyph = computed(() => {
   if (!device.connection.connected) return "○";
   return "◉";
@@ -42,7 +50,7 @@ const deviceLabel = computed(() => {
         <span class="value">{{ server.connected ? "linked" : "—" }}</span>
       </span>
     </div>
-    <span class="topbar-clock">{{ now }}</span>
+    <span class="topbar-clock"><span class="topbar-date">{{ date }}</span>{{ now }}</span>
   </header>
 </template>
 

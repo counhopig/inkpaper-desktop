@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import Frame from "../components/Frame.vue";
 import StatusMark from "../components/StatusMark.vue";
 import Button from "../components/Button.vue";
@@ -8,7 +8,7 @@ import EmptyState from "../components/EmptyState.vue";
 import { useDeviceStore } from "../stores/device";
 import { useServerStore } from "../stores/server";
 import { useLogsStore } from "../stores/logs";
-import { formatTimeShort } from "../lib/format";
+import { formatTimeShort, formatUtcOffset } from "../lib/format";
 import { getDeviceStatus, syncNow as syncNowCmd } from "../lib/commands";
 
 const emit = defineEmits<{ (e: "navigate", page: "overview" | "device" | "content" | "logs"): void }>();
@@ -71,8 +71,15 @@ const setupSteps = computed(() => {
     },
     {
       label: "Timezone",
-      done: false,
-      detail: "set on the Device page",
+      // The device always reports a timezone offset (defaults to 0 = UTC),
+      // so this step completes once a status reply has been received - i.e.
+      // the device is reachable and its clock offset is known. There is no
+      // "has the user explicitly set it" flag in the protocol.
+      done: ds?.timezoneOffsetMinutes != null,
+      detail:
+        ds?.timezoneOffsetMinutes != null
+          ? formatUtcOffset(ds.timezoneOffsetMinutes)
+          : "set on the Device page",
     },
     {
       label: "Desktop server access",
@@ -85,6 +92,36 @@ const setupSteps = computed(() => {
 });
 
 const recent = computed(() => logs.entries.slice(-12).reverse());
+
+// When a device connects (or is already connected when Overview opens),
+// pull its status once so the mini-screen shows live values instead of a
+// blank "offline". device.bootstrap() resolves after this component mounts,
+// so react to the connection flag rather than probing on mount.
+watch(
+  () => device.isConnected,
+  async (connected) => {
+    if (connected && !device.deviceStatus) {
+      const r = await device.run("status", getDeviceStatus);
+      if (r.ok && r.value) device.setDeviceStatusFromCommand(r.value);
+    }
+  },
+  { immediate: true },
+);
+
+const screenTime = computed(() =>
+  new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+);
+
+/** The next enabled alarm today (or the earliest one if all have passed). */
+const nextAlarmText = computed(() => {
+  const enabled = server.alarms.filter((a) => a.enabled);
+  if (enabled.length === 0) return "—";
+  const now = new Date();
+  const cur = now.getHours() * 60 + now.getMinutes();
+  const sorted = [...enabled].sort((a, b) => a.hour * 60 + a.minute - (b.hour * 60 + b.minute));
+  const next = sorted.find((a) => a.hour * 60 + a.minute > cur) ?? sorted[0];
+  return `${String(next.hour).padStart(2, "0")}:${String(next.minute).padStart(2, "0")}`;
+});
 </script>
 
 <template>
@@ -109,7 +146,29 @@ const recent = computed(() => logs.entries.slice(-12).reverse());
 
     <div class="page-grid">
       <div class="col-6">
-        <Frame title="Device status">
+        <Frame title="Device status" style="--i: 1">
+          <div class="ink-screen" aria-hidden="true">
+            <div class="ink-screen-top">
+              <span class="ink-screen-time">{{ screenTime }}</span>
+              <span class="ink-screen-batt">◼◼◼◼</span>
+            </div>
+            <div class="ink-screen-row">
+              <span class="lbl">Wi-Fi</span>
+              <span class="val">{{ device.deviceStatus?.wifiConnected ? "◉ " + (device.deviceStatus.wifiSsid ?? "connected") : "○ offline" }}</span>
+            </div>
+            <div class="ink-screen-row">
+              <span class="lbl">Sync</span>
+              <span class="val">{{ device.deviceStatus?.serverConfigured ? "● configured" : "○ not set" }}</span>
+            </div>
+            <div class="ink-screen-row">
+              <span class="lbl">Next</span>
+              <span class="val">▸ {{ nextAlarmText }}</span>
+            </div>
+            <div class="ink-screen-row">
+              <span class="lbl">Todo</span>
+              <span class="val">▸ {{ server.todoDoneCount }} / {{ server.todoCount }}</span>
+            </div>
+          </div>
           <div class="kv">
             <div class="k">Connection</div>
             <div class="v"><StatusMark :status="status" :label="device.connection.kind" /></div>
@@ -151,7 +210,21 @@ const recent = computed(() => logs.entries.slice(-12).reverse());
       </div>
 
       <div class="col-6">
-        <Frame title="Server status">
+        <Frame title="Server status" style="--i: 2">
+          <div class="stat-blocks">
+            <div class="stat-block">
+              <div class="num">{{ server.alarmCount }}</div>
+              <div class="cap">Alarms</div>
+            </div>
+            <div class="stat-block">
+              <div class="num">{{ server.todoDoneCount }}</div>
+              <div class="cap">Done</div>
+            </div>
+            <div class="stat-block">
+              <div class="num">{{ server.todoCount }}</div>
+              <div class="cap">Todos</div>
+            </div>
+          </div>
           <div class="kv">
             <div class="k">URL</div>
             <div class="v" style="font-family: var(--font-mono);">{{ server.baseUrl || "—" }}</div>
@@ -161,10 +234,6 @@ const recent = computed(() => logs.entries.slice(-12).reverse());
             </div>
             <div class="k">Selected device</div>
             <div class="v">{{ server.selectedDevice ? `${server.selectedDevice.name}` : "—" }}</div>
-            <div class="k">Alarms</div>
-            <div class="v">{{ server.alarmCount }}</div>
-            <div class="k">Todos</div>
-            <div class="v">{{ server.todoDoneCount }} / {{ server.todoCount }} done</div>
           </div>
           <template v-if="server.lastError">
             <Notice variant="error" :title="server.lastError.code">
@@ -178,7 +247,7 @@ const recent = computed(() => logs.entries.slice(-12).reverse());
       </div>
 
       <div class="col-8">
-        <Frame title="Setup progress">
+        <Frame title="Setup progress" style="--i: 3">
           <ol class="step-list">
             <li
               v-for="(s, idx) in setupSteps"
@@ -198,7 +267,7 @@ const recent = computed(() => logs.entries.slice(-12).reverse());
       </div>
 
       <div class="col-4">
-        <Frame title="Recent activity">
+        <Frame title="Recent activity" style="--i: 4">
           <EmptyState v-if="recent.length === 0" glyph="·" title="No activity yet">
             Connect a device or run a sync to populate this list.
           </EmptyState>
