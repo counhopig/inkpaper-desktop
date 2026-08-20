@@ -21,6 +21,19 @@ npm run tauri build    # release bundle
 
 Verification order after changes: `cargo clippy --all-targets` → `cargo test` → `npm run build`. Commit messages: conventional, lowercase type (`feat(ui):`, `fix(device):`, `refactor!:`), English.
 
+## Releases
+
+`.github/workflows/release.yml` builds macOS/Windows/Ubuntu installers (tauri-action) and **publishes automatically** (`releaseDraft: false`) whenever a `v*` tag is pushed to the `github` remote — no manual draft handling. Linux requires `libudev-dev` (the `serialport` crate depends on it) — it is already in the apt install list; if the Linux job ever fails on `libudev-sys`, that's the missing dep.
+
+- **Critical:** GitHub Actions runs the workflow file **at the tagged commit**, not at `main`. If you re-trigger a release by deleting + re-pushing a tag, the tag must point to a commit that already contains the latest workflow changes — otherwise the *old* workflow runs. Also delete the old release + remote tag first, because force-updating an existing tag does not reliably re-trigger the workflow:
+  ```bash
+  gh release delete v0.1.0 --repo counhopig/inkpaper-desktop --yes
+  git push github :refs/tags/v0.1.0
+  git tag -f v0.1.0 <commit-with-latest-workflow>
+  git push github v0.1.0
+  ```
+- Release check: `gh release view v0.1.0 --repo counhopig/inkpaper-desktop --json isDraft,assets` (expect `isDraft: false`, one asset per platform).
+
 ## Gotchas
 
 - **Log dir must stay outside the project tree** (`~/Library/Logs/inkpaper-desktop` on macOS): `tauri dev` watches the project root, so a log file inside it triggers an infinite dev-server restart loop. Logs mirror to stderr + `device-log` Tauri event; secrets go through `redact_secret` (never log Wi-Fi passwords / admin / device tokens verbatim).
