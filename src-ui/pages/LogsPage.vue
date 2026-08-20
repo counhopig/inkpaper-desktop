@@ -42,7 +42,8 @@ watch(
   },
 );
 
-onMounted(() => {
+onMounted(async () => {
+  await logs.refresh();
   scrollToBottom();
 });
 onBeforeUnmount(() => {

@@ -26,8 +26,7 @@ export const useLogsStore = defineStore("logs", () => {
   }
 
   async function bootstrap() {
-    const r = await C.readLogs();
-    if (r.ok) entries.value = r.value;
+    await refresh();
     const fp = await C.logFilePath();
     if (fp.ok) filePath.value = fp.value;
     const dp = await C.logDir();
@@ -42,6 +41,15 @@ export const useLogsStore = defineStore("logs", () => {
     } catch {
       // ignore in non-Tauri environments
     }
+  }
+
+  /** Re-read the full in-memory buffer from Rust. The `device-log` event
+   *  only carries entries appended *after* the listener was registered, so
+   *  any logs produced before the Logs page was opened (e.g. a device boot
+   *  spew) are missing unless we snapshot them explicitly on mount. */
+  async function refresh() {
+    const r = await C.readLogs();
+    if (r.ok) entries.value = r.value;
   }
 
   async function clear() {
@@ -93,6 +101,7 @@ export const useLogsStore = defineStore("logs", () => {
     visibleEntries,
     summary,
     bootstrap,
+    refresh,
     clear,
     flush,
   };
