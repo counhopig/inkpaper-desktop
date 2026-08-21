@@ -5,6 +5,20 @@ All notable changes to **inkwash-desktop** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-08-21
+
+### Added
+- **2.4 GHz Wi-Fi network scan** — the Device page's Settings tab can scan
+  nearby 2.4 GHz networks from the PC and pick one to fill the SSID field.
+  macOS uses CoreWLAN (Location Services permission), Windows parses
+  `netsh wlan show networks mode=bssid`, Linux parses `nmcli`.
+
+### Fixed
+- **USB protocol framing** — commands were still sent with the old
+  `>>IP ` / `<<IP ` prefixes after the rebrand, so the firmware (which only
+  recognises `>>IW ` / `<<IW `) ignored every USB command. The wire
+  prefixes now actually match `inkwash/docs/control-protocol.md`.
+
 ## [0.4.0] - 2026-08-21
 
 ### Changed

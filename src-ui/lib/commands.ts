@@ -14,6 +14,7 @@ import type {
   DeviceCommandResult,
   LogEntry,
   TodoInput,
+  WifiNetwork,
 } from "./types";
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: AppError };
@@ -85,6 +86,12 @@ export async function syncNow(): Promise<Result<DeviceCommandResult>> {
 
 export async function clearDeviceAlarms(): Promise<Result<DeviceCommandResult>> {
   return wrap(invoke<DeviceCommandResult>("clear_device_alarms"));
+}
+
+// ---------- Wi-Fi scan (PC-side) ----------
+
+export async function scanWifiNetworks(): Promise<Result<WifiNetwork[]>> {
+  return wrap(invoke<WifiNetwork[]>("scan_wifi_networks"));
 }
 
 // ---------- Server ----------

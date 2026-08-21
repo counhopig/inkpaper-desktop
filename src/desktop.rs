@@ -54,6 +54,7 @@ pub fn run() {
             commands::logs_cmd::log_dir,
             commands::logs_cmd::open_log_folder,
             commands::logs_cmd::export_log,
+            commands::scan::scan_wifi_networks,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Inkwash Desktop");

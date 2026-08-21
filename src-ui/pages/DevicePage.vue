@@ -22,7 +22,9 @@ import {
   setTimezone,
   syncNow,
   clearDeviceAlarms,
+  scanWifiNetworks,
 } from "../lib/commands";
+import type { WifiNetwork } from "../lib/types";
 
 const device = useDeviceStore();
 const server = useServerStore();
@@ -34,6 +36,33 @@ const selectedPort = ref("");
 const ssid = ref("");
 const password = ref("");
 const showPassword = ref(false);
+
+// PC-side 2.4 GHz scan state. Independent of the device connection - the
+// scan runs on this computer and only fills the SSID field below.
+const scanning = ref(false);
+const scannedNetworks = ref<WifiNetwork[]>([]);
+const scanError = ref("");
+
+async function scanNetworks() {
+  scanning.value = true;
+  scanError.value = "";
+  try {
+    const r = await scanWifiNetworks();
+    if (r.ok) {
+      scannedNetworks.value = r.value;
+    } else {
+      scannedNetworks.value = [];
+      scanError.value = r.error.message;
+    }
+  } finally {
+    scanning.value = false;
+  }
+}
+
+function pickNetwork(net: WifiNetwork) {
+  ssid.value = net.ssid;
+  scannedNetworks.value = [];
+}
 // Seed from the admin connection already configured on the Content page -
 // it's the same server/port, already proven reachable there, so retyping
 // it by hand can't drop the port. This field is NOT the admin base URL
@@ -259,6 +288,36 @@ const tzChoices = computed(() =>
           <Field label="SSID" :error="ssidError ?? undefined">
             <input v-model="ssid" type="text" placeholder="Network name" maxlength="32" />
           </Field>
+
+          <div class="frame-section">
+            <div class="row between">
+              <div>
+                <h3 style="margin:0; font-size: var(--t-14); font-weight: 600;">Nearby 2.4 GHz networks</h3>
+                <div class="hint">Scan from this PC, then pick a network to fill the SSID above.</div>
+              </div>
+              <Button :loading="scanning" @click="scanNetworks">Scan</Button>
+            </div>
+            <p v-if="scanError" class="scan-error">{{ scanError }}</p>
+            <ul v-else-if="scannedNetworks.length" class="network-list">
+              <li
+                v-for="net in scannedNetworks"
+                :key="net.ssid + net.channel"
+                type="button"
+                @click="pickNetwork(net)"
+              >
+                <span class="net-ssid">{{ net.ssid }}</span>
+                <span class="net-meta">
+                  ch {{ net.channel }}
+                  <template v-if="net.signal != null"> · {{ net.signal }}%</template>
+                  <template v-if="net.security"> · {{ net.security }}</template>
+                </span>
+              </li>
+            </ul>
+            <p v-else-if="!scanning" class="hint" style="margin-top: var(--s-2);">
+              No networks scanned yet.
+            </p>
+          </div>
+
           <Field label="Password" :error="passwordError ?? undefined" :hint="!password ? 'Empty password is allowed for open networks.' : undefined">
             <div class="row" style="gap: 0;">
               <input
@@ -377,3 +436,50 @@ const tzChoices = computed(() =>
     </section>
   </div>
 </template>
+
+<style scoped>
+.scan-error {
+  margin: var(--s-2) 0 0;
+  font-size: var(--t-13);
+  color: var(--ink-muted);
+}
+
+.network-list {
+  list-style: none;
+  margin: var(--s-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  max-height: 200px;
+  overflow-y: auto;
+  border: var(--b-1-soft);
+}
+
+.network-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-3);
+  font-size: var(--t-13);
+  cursor: pointer;
+  background: var(--surface-raised);
+}
+
+.network-list li:hover {
+  background: var(--surface-sunken);
+}
+
+.net-ssid {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.net-meta {
+  flex-shrink: 0;
+  color: var(--ink-muted);
+}
+</style>

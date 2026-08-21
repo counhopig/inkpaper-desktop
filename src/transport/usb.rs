@@ -1,7 +1,7 @@
 //! USB serial transport, matching `inkwash/docs/control-protocol.md`'s
-//! framing: commands go out as `>>IP {json}\n`, replies come back as
-//! `<<IP {json}\n` on the same line-oriented stream that also carries the
-//! device's ordinary `log::info!` output - any line without the `<<IP `
+//! framing: commands go out as `>>IW {json}\n`, replies come back as
+//! `<<IW {json}\n` on the same line-oriented stream that also carries the
+//! device's ordinary `log::info!` output - any line without the `<<IW `
 //! prefix is just log noise from this reader's point of view and is
 //! surfaced as a `Log` event instead of discarded, so the UI can show it
 //! for debugging.
@@ -13,8 +13,8 @@ use std::time::Duration;
 
 use crate::protocol::{self, Command, Reply};
 
-const COMMAND_PREFIX: &str = ">>IP ";
-const REPLY_PREFIX: &str = "<<IP ";
+const COMMAND_PREFIX: &str = ">>IW ";
+const REPLY_PREFIX: &str = "<<IW ";
 const BAUD_RATE: u32 = 115_200;
 
 pub enum UsbEvent {

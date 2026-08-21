@@ -68,6 +68,15 @@ export interface DeviceCommandResult {
   status?: DeviceStatus;
 }
 
+/** A nearby 2.4 GHz access point returned by the PC-side Wi-Fi scan. */
+export interface WifiNetwork {
+  ssid: string;
+  channel: number;
+  /** Signal strength as a 0-100 percentage, when the platform reports it. */
+  signal?: number;
+  security?: string;
+}
+
 export type LogLevel = "info" | "warn" | "error";
 
 export interface LogEntry {
