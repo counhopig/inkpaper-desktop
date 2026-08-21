@@ -5,7 +5,19 @@ All notable changes to **inkpaper-desktop** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] - 2026-08-21
+
+### Added
+- **Channels & inbox management** — manage webhook channels in the
+  Content page (create, copy the one-time delivery token, rotate) and
+  browse / delete the device inbox messages pushed from external sources.
+- **Urgent priority badge** — high-priority inbox items are marked in
+  the inbox list.
+
+### Changed
+- The Content page splits channels & inbox into side-by-side panels
+  instead of a single stacked list, and the completed-todo checkbox
+  matches the server console's filled style.
 
 ## [0.2.0] - 2026-08-20
 
