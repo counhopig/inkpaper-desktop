@@ -276,19 +276,24 @@
 }
 .checkbox input {
   appearance: none;
-  width: 14px;
-  height: 14px;
-  border: var(--b-1);
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--ink);
   background: var(--surface);
   margin: 0;
   display: inline-grid;
   place-items: center;
+  cursor: pointer;
+}
+.checkbox input:checked {
+  background: var(--ink);
 }
 .checkbox input:checked::before {
-  content: "×";
-  font-size: var(--t-15);
+  content: "✓";
+  font-size: var(--t-14);
   line-height: 1;
-  color: var(--ink);
+  color: var(--surface);
+  font-weight: 800;
 }
 .checkbox input:focus-visible { outline-offset: 2px; }
 

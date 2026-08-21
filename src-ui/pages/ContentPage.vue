@@ -681,13 +681,13 @@ function applyRepeatToAlarmForm(a: Alarm) {
         </Frame>
       </div>
 
-      <div class="col-12" style="margin-top: var(--s-4);">
+      <div class="col-6">
         <Frame
-          :title="server.selectedDevice ? `Channels & Inbox · ${server.selectedDevice.name}` : 'Channels & Inbox'"
-          subtitle="External sources push notifications to the device"
+          :title="server.selectedDevice ? `Channels · ${server.selectedDevice.name}` : 'Channels'"
+          subtitle="Sources that push notifications to this device"
         >
           <div class="row" style="align-items: flex-end; gap: var(--s-3); flex-wrap: wrap;">
-            <Field label="New webhook channel" style="flex: 1; min-width: 220px;">
+            <Field label="New webhook channel" style="flex: 1; min-width: 200px;">
               <input v-model="newChannelName" type="text" maxlength="80" placeholder="e.g. CI" @keyup.enter="createChannel" />
             </Field>
             <div class="row end">
@@ -696,7 +696,7 @@ function applyRepeatToAlarmForm(a: Alarm) {
                 :disabled="!server.connected || !server.selectedDevice || !newChannelName.trim()"
                 @click="createChannel"
               >
-                Create channel
+                Create
               </Button>
             </div>
           </div>
@@ -725,14 +725,19 @@ function applyRepeatToAlarmForm(a: Alarm) {
                 </div>
               </div>
               <div class="actions">
-                <Button size="small" variant="ghost" @click="rotateChannel(c)">Rotate token</Button>
+                <Button size="small" variant="ghost" @click="rotateChannel(c)">Rotate</Button>
                 <Button size="small" variant="danger" @click="removeChannel(c)">Delete</Button>
               </div>
             </div>
           </div>
+        </Frame>
+      </div>
 
-          <div class="divider" style="margin: var(--s-4) 0;"></div>
-
+      <div class="col-6">
+        <Frame
+          :title="server.selectedDevice ? `Inbox · ${server.selectedDevice.name}` : 'Inbox'"
+          :subtitle="`${server.inbox.filter((m) => !m.read).length} unread · ${server.inbox.length} total`"
+        >
           <EmptyState v-if="server.inbox.length === 0" glyph="·" title="No inbox messages">
             Messages delivered to this device's webhook channel appear here.
           </EmptyState>
