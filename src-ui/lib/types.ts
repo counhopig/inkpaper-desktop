@@ -80,6 +80,38 @@ export interface LogEntry {
 export interface ContentSnapshot {
   alarms: Alarm[];
   todos: Todo[];
+  channels: Channel[];
+  inbox: InboxItem[];
+}
+
+export interface Channel {
+  id: string;
+  deviceId: string;
+  kind: string;
+  name: string;
+  enabled: boolean;
+  tokenPrefix: string;
+  lastSyncAt: number | null;
+  lastSyncError: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ChannelCreated {
+  channel: Channel;
+  token?: string | null;
+  deliveryUrl?: string | null;
+}
+
+export type InboxKind = "alert" | "event" | "info";
+
+export interface InboxItem {
+  id: number;
+  kind: InboxKind;
+  title: string;
+  body: string;
+  when: number | null;
+  read: boolean;
 }
 
 export interface AlarmInput {

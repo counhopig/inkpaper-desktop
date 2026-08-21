@@ -7,6 +7,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   AlarmInput,
   AppError,
+  ChannelCreated,
   ConnectionStateInfo,
   ContentSnapshot,
   Device,
@@ -166,6 +167,46 @@ export async function clearTodos(baseUrl: string, token: string, deviceId: strin
 
 export async function listContent(baseUrl: string, token: string, deviceId: string): Promise<Result<ContentSnapshot>> {
   return wrap(invoke<ContentSnapshot>("list_content", { baseUrl, token, deviceId }));
+}
+
+export async function createWebhookChannel(
+  baseUrl: string,
+  token: string,
+  deviceId: string,
+  name: string,
+): Promise<Result<ChannelCreated>> {
+  return wrap(invoke<ChannelCreated>("create_webhook_channel", { baseUrl, token, deviceId, name }));
+}
+
+export async function deleteChannel(
+  baseUrl: string,
+  token: string,
+  deviceId: string,
+  channelId: string,
+): Promise<Result<null>> {
+  return wrap(invoke<null>("delete_channel", { baseUrl, token, deviceId, channelId }));
+}
+
+export async function rotateChannelToken(
+  baseUrl: string,
+  token: string,
+  deviceId: string,
+  channelId: string,
+): Promise<Result<string>> {
+  return wrap(invoke<string>("rotate_channel_token", { baseUrl, token, deviceId, channelId }));
+}
+
+export async function deleteInboxItem(
+  baseUrl: string,
+  token: string,
+  deviceId: string,
+  seq: number,
+): Promise<Result<null>> {
+  return wrap(invoke<null>("delete_inbox_item", { baseUrl, token, deviceId, seq }));
+}
+
+export async function clearInbox(baseUrl: string, token: string, deviceId: string): Promise<Result<null>> {
+  return wrap(invoke<null>("clear_inbox", { baseUrl, token, deviceId }));
 }
 
 // ---------- Logs ----------

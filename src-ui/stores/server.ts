@@ -13,7 +13,16 @@ import {
   saveSelectedDeviceId,
   saveServerBaseUrl,
 } from "../lib/storage";
-import type { Alarm, AlarmInput, Device, Todo, TodoInput } from "../lib/types";
+import type {
+  Alarm,
+  AlarmInput,
+  Channel,
+  ChannelCreated,
+  Device,
+  InboxItem,
+  Todo,
+  TodoInput,
+} from "../lib/types";
 
 export const useServerStore = defineStore("server", () => {
   const baseUrl = ref(loadServerBaseUrl());
@@ -25,6 +34,8 @@ export const useServerStore = defineStore("server", () => {
   const selectedDeviceId = ref<string | null>(loadSelectedDeviceId());
   const alarms = ref<Alarm[]>([]);
   const todos = ref<Todo[]>([]);
+  const channels = ref<Channel[]>([]);
+  const inbox = ref<InboxItem[]>([]);
 
   function setBaseUrl(value: string) {
     baseUrl.value = value;
@@ -43,6 +54,8 @@ export const useServerStore = defineStore("server", () => {
     saveSelectedDeviceId(id);
     alarms.value = [];
     todos.value = [];
+    channels.value = [];
+    inbox.value = [];
   }
 
   async function refreshDevices() {
@@ -101,6 +114,8 @@ export const useServerStore = defineStore("server", () => {
     if (r.ok) {
       alarms.value = r.value.alarms;
       todos.value = r.value.todos;
+      channels.value = r.value.channels;
+      inbox.value = r.value.inbox;
       connected.value = true;
       lastError.value = null;
     } else {
@@ -174,6 +189,49 @@ export const useServerStore = defineStore("server", () => {
     return r;
   }
 
+  async function createWebhookChannel(name: string): Promise<
+    | { ok: true; value: ChannelCreated }
+    | { ok: false; error: { code: string; message: string } }
+  > {
+    if (selectedDeviceId.value == null) return { ok: false as const, error: { code: "INVALID_INPUT", message: "No device selected" } };
+    const r = await C.createWebhookChannel(baseUrl.value, adminToken.value, selectedDeviceId.value, name);
+    if (r.ok) await refreshContent();
+    else lastError.value = { code: r.error.code, message: r.error.message };
+    return r;
+  }
+
+  async function deleteChannel(channelId: string) {
+    if (selectedDeviceId.value == null) return { ok: false as const, error: { code: "INVALID_INPUT", message: "No device selected" } };
+    const r = await C.deleteChannel(baseUrl.value, adminToken.value, selectedDeviceId.value, channelId);
+    if (r.ok) await refreshContent();
+    else lastError.value = { code: r.error.code, message: r.error.message };
+    return r;
+  }
+
+  async function rotateChannelToken(channelId: string) {
+    if (selectedDeviceId.value == null) return { ok: false as const, error: { code: "INVALID_INPUT", message: "No device selected" } };
+    const r = await C.rotateChannelToken(baseUrl.value, adminToken.value, selectedDeviceId.value, channelId);
+    if (r.ok) await refreshContent();
+    else lastError.value = { code: r.error.code, message: r.error.message };
+    return r;
+  }
+
+  async function deleteInboxItem(seq: number) {
+    if (selectedDeviceId.value == null) return { ok: false as const, error: { code: "INVALID_INPUT", message: "No device selected" } };
+    const r = await C.deleteInboxItem(baseUrl.value, adminToken.value, selectedDeviceId.value, seq);
+    if (r.ok) await refreshContent();
+    else lastError.value = { code: r.error.code, message: r.error.message };
+    return r;
+  }
+
+  async function clearInbox() {
+    if (selectedDeviceId.value == null) return { ok: false as const, error: { code: "INVALID_INPUT", message: "No device selected" } };
+    const r = await C.clearInbox(baseUrl.value, adminToken.value, selectedDeviceId.value);
+    if (r.ok) await refreshContent();
+    else lastError.value = { code: r.error.code, message: r.error.message };
+    return r;
+  }
+
   const selectedDevice = computed(() =>
     devices.value.find((d) => d.id === selectedDeviceId.value) ?? null,
   );
@@ -192,6 +250,8 @@ export const useServerStore = defineStore("server", () => {
     selectedDevice,
     alarms,
     todos,
+    channels,
+    inbox,
     alarmCount,
     todoCount,
     todoDoneCount,
@@ -210,5 +270,10 @@ export const useServerStore = defineStore("server", () => {
     updateTodo,
     deleteTodo,
     clearTodos,
+    createWebhookChannel,
+    deleteChannel,
+    rotateChannelToken,
+    deleteInboxItem,
+    clearInbox,
   };
 });

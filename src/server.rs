@@ -71,6 +71,45 @@ pub struct Device {
     pub token: Option<String>,
 }
 
+/// External channel (webhook / CalDAV) bound to a device - mirrors
+/// `inkpaper-server`'s `models::Channel`. Never contains the plaintext token.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Channel {
+    pub id: String,
+    pub device_id: String,
+    pub kind: String,
+    pub name: String,
+    pub enabled: bool,
+    pub token_prefix: String,
+    pub last_sync_at: Option<i64>,
+    pub last_sync_error: Option<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+/// Response to creating a webhook channel: the plaintext token is returned
+/// exactly once.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChannelCreated {
+    pub channel: Channel,
+    pub token: Option<String>,
+    pub delivery_url: Option<String>,
+}
+
+/// Inbox notification as seen over the admin API.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InboxItem {
+    pub id: u64,
+    pub kind: String,
+    pub title: String,
+    #[serde(default)]
+    pub body: String,
+    #[serde(default)]
+    pub when: Option<i64>,
+    #[serde(default)]
+    pub read: bool,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct UpsertAlarmRequest {
     pub hour: u8,
@@ -253,6 +292,93 @@ impl ServerClient {
         self.auth(
             self.client
                 .delete(self.url(&format!("/api/devices/{device_id}/todos"))),
+        )
+        .send()?
+        .error_for_status()?;
+        Ok(())
+    }
+
+    pub fn list_channels(&self, device_id: &str) -> anyhow::Result<Vec<Channel>> {
+        let resp = self
+            .auth(
+                self.client
+                    .get(self.url(&format!("/api/devices/{device_id}/channels"))),
+            )
+            .send()?
+            .error_for_status()?;
+        Ok(resp.json()?)
+    }
+
+    pub fn create_channel(&self, device_id: &str, name: &str) -> anyhow::Result<ChannelCreated> {
+        let resp = self
+            .auth(
+                self.client
+                    .post(self.url(&format!("/api/devices/{device_id}/channels"))),
+            )
+            .json(&serde_json::json!({ "kind": "webhook", "name": name }))
+            .send()?
+            .error_for_status()?;
+        Ok(resp.json()?)
+    }
+
+    pub fn delete_channel(&self, device_id: &str, channel_id: &str) -> anyhow::Result<()> {
+        self.auth(
+            self.client
+                .delete(self.url(&format!(
+                    "/api/devices/{device_id}/channels/{channel_id}"
+                ))),
+        )
+        .send()?
+        .error_for_status()?;
+        Ok(())
+    }
+
+    pub fn rotate_channel_token(
+        &self,
+        device_id: &str,
+        channel_id: &str,
+    ) -> anyhow::Result<String> {
+        let resp = self
+            .auth(
+                self.client
+                    .post(self.url(&format!(
+                        "/api/devices/{device_id}/channels/{channel_id}/rotate-token"
+                    ))),
+            )
+            .send()?
+            .error_for_status()?;
+        let v: serde_json::Value = resp.json()?;
+        Ok(v["token"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string())
+    }
+
+    pub fn list_inbox(&self, device_id: &str) -> anyhow::Result<Vec<InboxItem>> {
+        let resp = self
+            .auth(
+                self.client
+                    .get(self.url(&format!("/api/devices/{device_id}/inbox"))),
+            )
+            .send()?
+            .error_for_status()?;
+        Ok(resp.json()?)
+    }
+
+    pub fn delete_inbox_item(&self, device_id: &str, seq: u64) -> anyhow::Result<()> {
+        self.auth(
+            self.client
+                .delete(self.url(&format!("/api/devices/{device_id}/inbox/{seq}"))),
+        )
+        .send()?
+        .error_for_status()?;
+        Ok(())
+    }
+
+    pub fn clear_inbox(&self, device_id: &str) -> anyhow::Result<()> {
+        self.auth(
+            self.client
+                .delete(self.url(&format!("/api/devices/{device_id}/inbox"))),
         )
         .send()?
         .error_for_status()?;

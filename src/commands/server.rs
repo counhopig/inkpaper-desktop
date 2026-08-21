@@ -12,8 +12,8 @@ use tauri::State;
 use crate::desktop::SharedState;
 use crate::error::{from_reqwest, AppError};
 use crate::server::{
-    Alarm, Device, Importance, Repeat, ServerClient, Todo, TodoDue, UpsertAlarmRequest,
-    UpsertTodoRequest,
+    Alarm, Channel, ChannelCreated, Device, Importance, InboxItem, Repeat, ServerClient, Todo,
+    TodoDue, UpsertAlarmRequest, UpsertTodoRequest,
 };
 
 fn client(base_url: String, token: String) -> Result<ServerClient, AppError> {
@@ -314,6 +314,8 @@ pub async fn clear_todos(
 pub struct ContentSnapshot {
     pub alarms: Vec<Alarm>,
     pub todos: Vec<Todo>,
+    pub channels: Vec<Channel>,
+    pub inbox: Vec<InboxItem>,
 }
 
 #[tauri::command]
@@ -325,16 +327,128 @@ pub async fn list_content(
 ) -> Result<ContentSnapshot, AppError> {
     state.logs.info(
         "server",
-        format!("→ GET {base_url}/api/devices/{device_id}/(alarms+todos)"),
+        format!("→ GET {base_url}/api/devices/{device_id}/(alarms+todos+channels+inbox)"),
     );
     tauri::async_runtime::spawn_blocking(move || -> Result<ContentSnapshot, AppError> {
         let c = client(base_url, token)?;
         let alarms = c.list_alarms(&device_id).map_err(map_err)?;
         let todos = c.list_todos(&device_id).map_err(map_err)?;
-        Ok(ContentSnapshot { alarms, todos })
+        let channels = c.list_channels(&device_id).map_err(map_err)?;
+        let inbox = c.list_inbox(&device_id).map_err(map_err)?;
+        Ok(ContentSnapshot {
+            alarms,
+            todos,
+            channels,
+            inbox,
+        })
     })
     .await
     .map_err(|e| AppError::internal(format!("list_content task: {e}")))?
+}
+
+// ---------- Channels & inbox ----------
+
+#[tauri::command]
+pub async fn create_webhook_channel(
+    base_url: String,
+    token: String,
+    device_id: String,
+    name: String,
+    state: State<'_, SharedState>,
+) -> Result<ChannelCreated, AppError> {
+    if name.trim().is_empty() || name.chars().count() > 80 {
+        return Err(AppError::invalid_input("name", "must be 1..80 chars"));
+    }
+    state.logs.info(
+        "server",
+        format!("→ POST {base_url}/api/devices/{device_id}/channels (webhook)"),
+    );
+    tauri::async_runtime::spawn_blocking(move || -> Result<ChannelCreated, AppError> {
+        let c = client(base_url, token)?;
+        c.create_channel(&device_id, &name).map_err(map_err)
+    })
+    .await
+    .map_err(|e| AppError::internal(format!("create_webhook_channel task: {e}")))?
+}
+
+#[tauri::command]
+pub async fn delete_channel(
+    base_url: String,
+    token: String,
+    device_id: String,
+    channel_id: String,
+    state: State<'_, SharedState>,
+) -> Result<(), AppError> {
+    state.logs.info(
+        "server",
+        format!("→ DELETE {base_url}/api/devices/{device_id}/channels/{channel_id}"),
+    );
+    tauri::async_runtime::spawn_blocking(move || -> Result<(), AppError> {
+        let c = client(base_url, token)?;
+        c.delete_channel(&device_id, &channel_id).map_err(map_err)
+    })
+    .await
+    .map_err(|e| AppError::internal(format!("delete_channel task: {e}")))?
+}
+
+#[tauri::command]
+pub async fn rotate_channel_token(
+    base_url: String,
+    token: String,
+    device_id: String,
+    channel_id: String,
+    state: State<'_, SharedState>,
+) -> Result<String, AppError> {
+    state.logs.info(
+        "server",
+        format!("→ POST {base_url}/api/devices/{device_id}/channels/{channel_id}/rotate-token"),
+    );
+    tauri::async_runtime::spawn_blocking(move || -> Result<String, AppError> {
+        let c = client(base_url, token)?;
+        c.rotate_channel_token(&device_id, &channel_id)
+            .map_err(map_err)
+    })
+    .await
+    .map_err(|e| AppError::internal(format!("rotate_channel_token task: {e}")))?
+}
+
+#[tauri::command]
+pub async fn delete_inbox_item(
+    base_url: String,
+    token: String,
+    device_id: String,
+    seq: u64,
+    state: State<'_, SharedState>,
+) -> Result<(), AppError> {
+    state.logs.info(
+        "server",
+        format!("→ DELETE {base_url}/api/devices/{device_id}/inbox/{seq}"),
+    );
+    tauri::async_runtime::spawn_blocking(move || -> Result<(), AppError> {
+        let c = client(base_url, token)?;
+        c.delete_inbox_item(&device_id, seq).map_err(map_err)
+    })
+    .await
+    .map_err(|e| AppError::internal(format!("delete_inbox_item task: {e}")))?
+}
+
+#[tauri::command]
+pub async fn clear_inbox(
+    base_url: String,
+    token: String,
+    device_id: String,
+    state: State<'_, SharedState>,
+) -> Result<(), AppError> {
+    state.logs.warn(
+        "server",
+        format!("→ DELETE {base_url}/api/devices/{device_id}/inbox (clear read)"),
+    );
+    tauri::async_runtime::spawn_blocking(move || -> Result<(), AppError> {
+        let c = client(base_url, token)?;
+        c.clear_inbox(&device_id).map_err(map_err)
+    })
+    .await
+    .map_err(|e| AppError::internal(format!("clear_inbox task: {e}")))?
 }
 
 // ---------- helpers ----------

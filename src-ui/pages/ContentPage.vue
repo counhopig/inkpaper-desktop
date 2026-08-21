@@ -8,7 +8,7 @@ import EmptyState from "../components/EmptyState.vue";
 import ConfirmDialog from "../components/ConfirmDialog.vue";
 import { useServerStore } from "../stores/server";
 import { validateAlarm, validateTodo, isAlarmFormValid, isTodoFormValid } from "../lib/validation";
-import type { Alarm, AlarmInput, Importance, Repeat, Todo, TodoDue, TodoInput } from "../lib/types";
+import type { Alarm, AlarmInput, Channel, Importance, InboxItem, Repeat, Todo, TodoDue, TodoInput } from "../lib/types";
 
 const server = useServerStore();
 
@@ -19,6 +19,13 @@ const registerError = ref<string | null>(null);
 const registeredToken = ref<string | null>(null);
 
 const showServerToken = ref(false);
+const newChannelName = ref("");
+const channelError = ref<string | null>(null);
+const createdChannelToken = ref<{ channel: Channel; token: string; url: string } | null>(null);
+
+const confirmClearAlarms = ref(false);
+const confirmClearTodos = ref(false);
+const confirmClearInbox = ref(false);
 const newAlarm = ref<AlarmInput>({
   hour: 7,
   minute: 0,
@@ -32,9 +39,6 @@ const newTodoDueText = ref("");
 const newTodoRepeatKind = ref<"" | "Daily" | "Weekly" | "Monthly">("");
 const newTodoRepeatDays = ref("");
 const editingTodoId = ref<number | null>(null);
-
-const confirmClearAlarms = ref(false);
-const confirmClearTodos = ref(false);
 
 onMounted(async () => {
   if (server.baseUrl && server.adminToken) {
@@ -266,6 +270,55 @@ function importanceClass(i: Importance): string {
 async function doClearTodos() {
   await server.clearTodos();
   confirmClearTodos.value = false;
+}
+
+async function createChannel() {
+  channelError.value = null;
+  const name = newChannelName.value.trim();
+  if (!name) {
+    channelError.value = "Channel name must not be empty";
+    return;
+  }
+  const r = await server.createWebhookChannel(name);
+  if (r.ok) {
+    newChannelName.value = "";
+    createdChannelToken.value = r.value.token
+      ? { channel: r.value.channel, token: r.value.token, url: r.value.deliveryUrl ?? "" }
+      : null;
+  } else {
+    channelError.value = `${r.error.code}: ${r.error.message}`;
+  }
+}
+
+async function removeChannel(c: Channel) {
+  await server.deleteChannel(c.id);
+}
+
+async function rotateChannel(c: Channel) {
+  const r = await server.rotateChannelToken(c.id);
+  if (r.ok && r.value) {
+    createdChannelToken.value = { channel: c, token: r.value, url: `/api/channels/${c.id}/messages` };
+  }
+}
+
+function copyChannelToken() {
+  if (createdChannelToken.value) navigator.clipboard.writeText(createdChannelToken.value.token).catch(() => {});
+}
+
+async function removeInboxItem(seq: number) {
+  await server.deleteInboxItem(seq);
+}
+
+async function doClearInbox() {
+  await server.clearInbox();
+  confirmClearInbox.value = false;
+}
+
+function inboxTime(m: InboxItem): string {
+  if (!m.when) return "";
+  const d = new Date(m.when * 1000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function formatAlarm(a: Alarm): string {
@@ -627,6 +680,88 @@ function applyRepeatToAlarmForm(a: Alarm) {
           </div>
         </Frame>
       </div>
+
+      <div class="col-12" style="margin-top: var(--s-4);">
+        <Frame
+          :title="server.selectedDevice ? `Channels & Inbox · ${server.selectedDevice.name}` : 'Channels & Inbox'"
+          subtitle="External sources push notifications to the device"
+        >
+          <div class="row" style="align-items: flex-end; gap: var(--s-3); flex-wrap: wrap;">
+            <Field label="New webhook channel" style="flex: 1; min-width: 220px;">
+              <input v-model="newChannelName" type="text" maxlength="80" placeholder="e.g. CI" @keyup.enter="createChannel" />
+            </Field>
+            <div class="row end">
+              <Button
+                variant="primary"
+                :disabled="!server.connected || !server.selectedDevice || !newChannelName.trim()"
+                @click="createChannel"
+              >
+                Create channel
+              </Button>
+            </div>
+          </div>
+          <p v-if="channelError" class="hint" style="color: var(--ink);">Error: {{ channelError }}</p>
+
+          <div v-if="createdChannelToken" class="box">
+            <div class="title">Webhook token (shown once) — copy it now</div>
+            <div class="token-line">{{ createdChannelToken.token }}</div>
+            <div class="meta">Delivery URL: {{ createdChannelToken.url }}</div>
+            <div class="row" style="gap: var(--s-2); margin-top: var(--s-2);">
+              <Button size="small" variant="primary" @click="copyChannelToken">Copy token</Button>
+              <Button size="small" variant="ghost" @click="createdChannelToken = null">Dismiss</Button>
+            </div>
+          </div>
+
+          <EmptyState v-if="server.channels.length === 0" glyph="·" title="No channels yet">
+            Create a webhook channel above, then POST messages to its delivery URL.
+          </EmptyState>
+          <div v-else class="row-list" style="margin-top: var(--s-3);">
+            <div v-for="c in server.channels" :key="c.id" class="row-item">
+              <div class="body">
+                <div class="title">{{ c.name }}</div>
+                <div class="meta">
+                  {{ c.kind }} · token {{ c.tokenPrefix }}… ·
+                  <span :class="['mark', c.enabled ? 'ok' : 'idle']">{{ c.enabled ? "enabled" : "disabled" }}</span>
+                </div>
+              </div>
+              <div class="actions">
+                <Button size="small" variant="ghost" @click="rotateChannel(c)">Rotate token</Button>
+                <Button size="small" variant="danger" @click="removeChannel(c)">Delete</Button>
+              </div>
+            </div>
+          </div>
+
+          <div class="divider" style="margin: var(--s-4) 0;"></div>
+
+          <EmptyState v-if="server.inbox.length === 0" glyph="·" title="No inbox messages">
+            Messages delivered to this device's webhook channel appear here.
+          </EmptyState>
+          <div v-else class="row-list">
+            <div v-for="m in server.inbox" :key="m.id" class="row-item">
+              <div class="body">
+                <div class="title">
+                  <span :class="['mark', m.read ? 'idle' : 'ok']">{{ m.read ? "read" : "new" }}</span>
+                  {{ m.title }}
+                </div>
+                <div class="meta">{{ m.kind }}{{ inboxTime(m) ? " · " + inboxTime(m) : "" }}</div>
+                <div v-if="m.body" class="meta">{{ m.body }}</div>
+              </div>
+              <div class="actions">
+                <Button size="small" variant="danger" @click="removeInboxItem(m.id)">Delete</Button>
+              </div>
+            </div>
+          </div>
+          <div class="row end" style="margin-top: var(--s-3);">
+            <Button
+              variant="danger"
+              :disabled="!server.connected || !server.selectedDevice || server.inbox.length === 0"
+              @click="confirmClearInbox = true"
+            >
+              Clear read messages
+            </Button>
+          </div>
+        </Frame>
+      </div>
     </section>
 
     <ConfirmDialog
@@ -647,6 +782,16 @@ function applyRepeatToAlarmForm(a: Alarm) {
       destructive
       @cancel="confirmClearTodos = false"
       @confirm="doClearTodos"
+    />
+
+    <ConfirmDialog
+      :open="confirmClearInbox"
+      title="Clear read inbox messages?"
+      description="This deletes every read message currently stored for this device on the server. Unread messages are kept."
+      confirm-label="Clear read"
+      destructive
+      @cancel="confirmClearInbox = false"
+      @confirm="doClearInbox"
     />
   </div>
 </template>
