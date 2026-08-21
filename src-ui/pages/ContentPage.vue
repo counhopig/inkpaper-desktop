@@ -746,6 +746,7 @@ function applyRepeatToAlarmForm(a: Alarm) {
               <div class="body">
                 <div class="title">
                   <span :class="['mark', m.read ? 'idle' : 'ok']">{{ m.read ? "read" : "new" }}</span>
+                  <span v-if="m.priority === 'high'" class="mark warn">!! urgent</span>
                   {{ m.title }}
                 </div>
                 <div class="meta">{{ m.kind }}{{ inboxTime(m) ? " · " + inboxTime(m) : "" }}</div>
