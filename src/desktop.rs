@@ -56,5 +56,5 @@ pub fn run() {
             commands::logs_cmd::export_log,
         ])
         .run(tauri::generate_context!())
-        .expect("failed to run Inkpaper Desktop");
+        .expect("failed to run Inkwash Desktop");
 }

@@ -1,4 +1,4 @@
-//! Tauri commands for talking to the Inkpaper device over USB or BLE.
+//! Tauri commands for talking to the Inkwash device over USB or BLE.
 //!
 //! The two phases of every command are split so the application-wide
 //! `state.link` mutex is *released* before the slow `recv_timeout()`
@@ -278,7 +278,7 @@ pub async fn connect_ble(state: State<'_, SharedState>) -> Result<(), AppError> 
             .map_err(|e| AppError::internal(format!("link mutex poisoned: {e}")))?;
         *g = LinkState::Ble(BleHandle::new(link));
     }
-    shared.logs.info("device", "BLE connected · Inkpaper");
+    shared.logs.info("device", "BLE connected · Inkwash");
     emit_connection_changed(&shared);
     Ok(())
 }

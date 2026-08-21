@@ -4,7 +4,7 @@
 //! point-of-view:
 //!
 //! * stderr (so `cargo run -- --ble-scan` and the GUI both see it)
-//! * a per-launch `<log_dir>/inkpaper-desktop-<epoch>.log` file
+//! * a per-launch `<log_dir>/inkwash-desktop-<epoch>.log` file
 //! * `device-log` Tauri event (so the Logs page can render in real time
 //!   without polling every 100ms - see migration plan §8.3)
 //!
@@ -21,7 +21,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
-const LOG_PREFIX: &str = "inkpaper-desktop-";
+const LOG_PREFIX: &str = "inkwash-desktop-";
 const LOG_SUFFIX: &str = ".log";
 const MAX_INMEM_ENTRIES: usize = 4_000;
 
@@ -29,22 +29,22 @@ fn platform_log_dir() -> PathBuf {
     #[cfg(target_os = "macos")]
     {
         if let Some(home) = std::env::var_os("HOME") {
-            return PathBuf::from(home).join("Library/Logs/inkpaper-desktop");
+            return PathBuf::from(home).join("Library/Logs/inkwash-desktop");
         }
     }
     #[cfg(target_os = "windows")]
     {
         if let Some(base) = std::env::var_os("LOCALAPPDATA") {
-            return PathBuf::from(base).join("inkpaper-desktop").join("logs");
+            return PathBuf::from(base).join("inkwash-desktop").join("logs");
         }
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         if let Some(home) = std::env::var_os("HOME") {
-            return PathBuf::from(home).join(".local/share/inkpaper-desktop/logs");
+            return PathBuf::from(home).join(".local/share/inkwash-desktop/logs");
         }
     }
-    std::env::temp_dir().join("inkpaper-desktop")
+    std::env::temp_dir().join("inkwash-desktop")
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]

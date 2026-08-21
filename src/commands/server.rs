@@ -1,4 +1,4 @@
-//! Tauri commands for talking to `inkpaper-server`'s admin API. These
+//! Tauri commands for talking to `inkwash-server`'s admin API. These
 //! all run on a worker thread (`spawn_blocking`) since `reqwest` here
 //! is in blocking mode (matches the existing `ServerClient`).
 //!

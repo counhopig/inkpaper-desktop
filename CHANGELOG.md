@@ -1,9 +1,16 @@
 # Changelog
 
-All notable changes to **inkpaper-desktop** are documented in this file.
+All notable changes to **inkwash-desktop** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.4.0] - 2026-08-21
+
+### Changed
+- **Rebranded to Inkwash** - package and bundle names (Inkwash Desktop),
+  and the device protocol framing (`>>IW ` / `<<IW `) matching the new
+  firmware.
 
 ## [0.3.0] - 2026-08-21
 
@@ -43,7 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   configuration tool.
 - Four pages: Overview (device/server state), Device (USB/BLE connect,
   Wi-Fi/server/timezone config, Sync Now), Content (register devices and
-  author alarms/todos against `inkpaper-server`'s admin API), and Logs
+  author alarms/todos against `inkwash-server`'s admin API), and Logs
   (real-time diagnostics with secret redaction).
 - USB serial and BLE transports talking the firmware's control protocol.
 - Headless CLI mode: `--status <port>`, `--sync <port>`, `--ble-scan`,

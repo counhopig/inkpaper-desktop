@@ -204,10 +204,10 @@ const tzChoices = computed(() =>
               <div class="row between">
                 <div>
                   <h3 style="margin:0; font-size: var(--t-14); font-weight: 600;">Bluetooth</h3>
-                  <div class="hint">The Inkpaper only advertises while its BLE Pairing screen is open.</div>
+                  <div class="hint">The Inkwash only advertises while its BLE Pairing screen is open.</div>
                 </div>
                 <Button :loading="bleScanning" :disabled="device.isConnected" @click="scanBle">
-                  {{ device.isConnected ? "Connected" : "Scan for Inkpaper" }}
+                  {{ device.isConnected ? "Connected" : "Scan for Inkwash" }}
                 </Button>
               </div>
             </div>
@@ -354,7 +354,7 @@ const tzChoices = computed(() =>
       <div class="col-6">
         <Frame title="Local cleanup" subtitle="Acts on the device, not the server">
           <p class="hint">
-            Clearing local alarms removes every alarm stored on the Inkpaper itself. Use this before registering
+            Clearing local alarms removes every alarm stored on the Inkwash itself. Use this before registering
             a new device or after a server reset. Server-side alarms are unaffected until the next sync.
           </p>
           <div class="row end">

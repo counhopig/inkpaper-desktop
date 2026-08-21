@@ -31,7 +31,7 @@ pub struct AppState {
 impl AppState {
     pub fn new(ctx: AppHandle) -> Self {
         let logs = LogStore::new(ctx.clone());
-        logs.info("app", "Inkpaper Desktop started");
+        logs.info("app", "Inkwash Desktop started");
         Self {
             link: Mutex::new(LinkState::Disconnected),
             logs,
@@ -65,7 +65,7 @@ impl LinkState {
         match self {
             Self::Disconnected => "—".into(),
             Self::Usb(_) => "USB serial".into(),
-            Self::Ble(_) => "Inkpaper (BLE)".into(),
+            Self::Ble(_) => "Inkwash (BLE)".into(),
         }
     }
 }

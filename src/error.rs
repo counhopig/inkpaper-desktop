@@ -47,7 +47,7 @@ impl AppError {
     pub fn ble_not_found() -> Self {
         Self::new(
             "BLE_NOT_FOUND",
-            "No Inkpaper BLE device found - make sure its BLE Pairing screen is open",
+            "No Inkwash BLE device found - make sure its BLE Pairing screen is open",
         )
     }
 

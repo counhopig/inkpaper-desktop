@@ -1,5 +1,5 @@
 //! Wire types mirroring the firmware's `control.rs`
-//! (`inkpaper/docs/control-protocol.md`) - this crate sends `Command` JSON
+//! (`inkwash/docs/control-protocol.md`) - this crate sends `Command` JSON
 //! and parses `Reply` JSON, so the tag/field names must match the
 //! firmware's `Serialize`/`Deserialize` derives exactly. USB and BLE both
 //! carry the same JSON payloads; only the framing differs (see

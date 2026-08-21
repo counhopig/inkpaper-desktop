@@ -1,4 +1,4 @@
-//! BLE transport, matching `inkpaper/docs/control-protocol.md`'s BLE
+//! BLE transport, matching `inkwash/docs/control-protocol.md`'s BLE
 //! Framing section: commands are written to the write characteristic as
 //! plain JSON (no line framing needed - GATT writes are already
 //! message-delimited), replies arrive as notifications on the separate
@@ -22,7 +22,7 @@ const SERVICE_UUID: &str = "d2c25e50-5e22-48d8-a8b3-34f2f8e2c7d4";
 const WRITE_CHAR_UUID: &str = "d2c25e51-5e22-48d8-a8b3-34f2f8e2c7d4";
 const NOTIFY_CHAR_UUID: &str = "d2c25e52-5e22-48d8-a8b3-34f2f8e2c7d4";
 /// Advertised device name set in `ble_control.rs::BleControl::start`.
-const DEVICE_NAME: &str = "Inkpaper";
+const DEVICE_NAME: &str = "Inkwash";
 
 pub enum BleEvent {
     Reply(Reply),

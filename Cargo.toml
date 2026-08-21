@@ -1,6 +1,6 @@
 [package]
-name = "inkpaper-desktop"
-version = "0.3.0"
+name = "inkwash-desktop"
+version = "0.4.0"
 edition = "2021"
 
 [build-dependencies]

@@ -1,7 +1,7 @@
-# Inkpaper Desktop
+# Inkwash Desktop
 
 PC configuration tool for the **Zectrix Note 4** e-ink device and the
-[**Inkpaper**](https://github.com/counhopig/inkpaper-firmware) ecosystem.
+[**Inkwash**](https://github.com/counhopig/inkwash-firmware) ecosystem.
 A cross-platform (Linux / macOS / Windows) native app built with:
 
 - **Tauri 2** — native window, system menus, file dialogs, notifications
@@ -14,8 +14,8 @@ A cross-platform (Linux / macOS / Windows) native app built with:
 
 ```mermaid
 flowchart LR
-    T["inkpaper-desktop"] -->|"USB serial / BLE"| D["Zectrix Note 4<br/>inkpaper-firmware"]
-    T -->|"HTTPS admin API"| S["inkpaper-server"]
+    T["inkwash-desktop"] -->|"USB serial / BLE"| D["Zectrix Note 4<br/>inkwash-firmware"]
+    T -->|"HTTPS admin API"| S["inkwash-server"]
     D -->|"HTTPS POST /api/sync"| S
 ```
 
@@ -25,9 +25,9 @@ It does **not** author content on the device. Four jobs:
 - **Device** — push Wi-Fi credentials, sync server URL + device token,
   and timezone to the Note 4 over USB serial or BLE; trigger a sync; check
   status. Talks the protocol in the firmware repo's
-  [`docs/control-protocol.md`](https://github.com/counhopig/inkpaper-firmware/blob/main/docs/control-protocol.md).
+  [`docs/control-protocol.md`](https://github.com/counhopig/inkwash-firmware/blob/main/docs/control-protocol.md).
 - **Content** — register devices and manage their alarms/todos against
-  `inkpaper-server`'s admin API. This is where actual content gets
+  `inkwash-server`'s admin API. This is where actual content gets
   authored; the device just pulls it later over Wi-Fi. Also manages
   **channels** (create webhook channels, copy the one-time delivery token,
   rotate it) and the device **inbox** (view/delete messages pushed from
@@ -38,14 +38,14 @@ It does **not** author content on the device. Four jobs:
 ## Repository layout
 
 ```text
-inkpaper-desktop/
+inkwash-desktop/
 ├── src/                       # Rust (Tauri + transport + server client)
 │   ├── main.rs                # CLI dispatch and Tauri launch
 │   ├── desktop.rs             # Tauri builder + invoke_handler registration
 │   ├── state.rs               # AppState + LinkState + Usb/Ble handles
 │   ├── error.rs               # AppError + error-code catalog
 │   ├── protocol.rs            # Wire types shared with the firmware
-│   ├── server.rs              # HTTP client for inkpaper-server
+│   ├── server.rs              # HTTP client for inkwash-server
 │   ├── transport/             # USB and BLE workers
 │   └── commands/              # Tauri commands (one file per surface)
 ├── src-ui/                    # Vue 3 + TS + Pinia
@@ -94,10 +94,10 @@ The same binary runs headless for scripting — CLI args never launch the
 Tauri window:
 
 ```bash
-inkpaper-desktop --ble-scan                        # true/false if a Note 4 advertises
-inkpaper-desktop --ble-list                        # full btleplug peripheral dump
-inkpaper-desktop --status /dev/cu.usbmodem1101     # USB status (default timeout 35s)
-inkpaper-desktop --sync   /dev/cu.usbmodem1101     # USB sync (default timeout 45s)
+inkwash-desktop --ble-scan                        # true/false if a Note 4 advertises
+inkwash-desktop --ble-list                        # full btleplug peripheral dump
+inkwash-desktop --status /dev/cu.usbmodem1101     # USB status (default timeout 35s)
+inkwash-desktop --sync   /dev/cu.usbmodem1101     # USB sync (default timeout 45s)
 ```
 
 The ESP32-S3 USB Serial/JTAG port may reset the board on open, so
@@ -124,9 +124,9 @@ Logs go to a platform data directory (outside the project tree, so
 
 | OS      | Directory                                |
 | ------- | ---------------------------------------- |
-| macOS   | `~/Library/Logs/inkpaper-desktop/`       |
-| Windows | `%LOCALAPPDATA%\inkpaper-desktop\logs\`  |
-| Linux   | `~/.local/share/inkpaper-desktop/logs/`  |
+| macOS   | `~/Library/Logs/inkwash-desktop/`       |
+| Windows | `%LOCALAPPDATA%\inkwash-desktop\logs\`  |
+| Linux   | `~/.local/share/inkwash-desktop/logs/`  |
 
 Sensitive values (Wi-Fi passwords, admin/device tokens) are redacted on
 disk; USB/BLE command names, replies and error codes are logged verbatim.

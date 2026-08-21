@@ -9,7 +9,7 @@ mod server;
 mod state;
 mod transport;
 
-/// `inkpaper-desktop --status <serial-port> [timeout-seconds]`: headless USB status check,
+/// `inkwash-desktop --status <serial-port> [timeout-seconds]`: headless USB status check,
 /// useful for verifying a connection without going through the GUI (e.g.
 /// scripting, or a machine with no display). Everything else launches the
 /// normal window.
@@ -17,8 +17,8 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() == 2 && args[1] == "--ble-scan" {
         match transport::ble::BleLink::discover() {
-            Ok(true) => println!("Inkpaper BLE advertisement found"),
-            Ok(false) => println!("Inkpaper BLE advertisement not found"),
+            Ok(true) => println!("Inkwash BLE advertisement found"),
+            Ok(false) => println!("Inkwash BLE advertisement not found"),
             Err(err) => {
                 eprintln!("BLE scan failed: {err:#}");
                 std::process::exit(1);

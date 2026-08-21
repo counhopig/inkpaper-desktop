@@ -1,6 +1,6 @@
-//! HTTP client for `inkpaper-server`'s admin API (device registration,
+//! HTTP client for `inkwash-server`'s admin API (device registration,
 //! alarm/todo management). Mirrors the wire types in
-//! `inkpaper-server/src/models.rs`, which in turn mirror the firmware's
+//! `inkwash-server/src/models.rs`, which in turn mirror the firmware's
 //! `alarms::StoredAlarm`/`todos::Todo` - three independent copies of the
 //! same shape across three repos/languages-in-spirit, kept honest by the
 //! shared JSON contract rather than shared code.
@@ -12,7 +12,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Recurrence schedule, mirroring `inkpaper-server`'s `models::Repeat`.
+/// Recurrence schedule, mirroring `inkwash-server`'s `models::Repeat`.
 /// Externally tagged: `"Daily"`, `{"Weekly": {"days": [...]}}`,
 /// `{"Monthly": {"days": [...]}}`, or `{"Once": {...}}`. Weekdays are
 /// 0=Sunday..6=Saturday; month days are 1..=31.
@@ -72,7 +72,7 @@ pub struct Device {
 }
 
 /// External channel (webhook / CalDAV) bound to a device - mirrors
-/// `inkpaper-server`'s `models::Channel`. Never contains the plaintext token.
+/// `inkwash-server`'s `models::Channel`. Never contains the plaintext token.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Channel {
     pub id: String,
@@ -429,7 +429,7 @@ mod live_server_tests {
             return;
         }
         let c = ServerClient::new(LIVE_URL.into(), "dummy".into());
-        let err = c.register_device("inkpaper-cli-test").expect_err("expected auth error");
+        let err = c.register_device("inkwash-cli-test").expect_err("expected auth error");
         let downcasted = err.downcast::<reqwest::Error>().expect("reqwest error");
         let status = downcasted.status().expect("status code");
         assert!(

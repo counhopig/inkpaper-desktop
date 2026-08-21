@@ -1,4 +1,4 @@
-//! USB serial transport, matching `inkpaper/docs/control-protocol.md`'s
+//! USB serial transport, matching `inkwash/docs/control-protocol.md`'s
 //! framing: commands go out as `>>IP {json}\n`, replies come back as
 //! `<<IP {json}\n` on the same line-oriented stream that also carries the
 //! device's ordinary `log::info!` output - any line without the `<<IP `

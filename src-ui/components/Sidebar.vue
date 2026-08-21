@@ -30,7 +30,7 @@ const status = computed(() => {
     <div class="sidebar-brand">
       <div class="mark" aria-hidden="true">Ip</div>
       <div class="wordmark">
-        <div class="name">Inkpaper</div>
+        <div class="name">Inkwash</div>
         <div class="sub">Desktop</div>
       </div>
     </div>

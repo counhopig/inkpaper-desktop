@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Inkpaper Desktop",
-  "version": "0.3.0",
-  "identifier": "dev.inkpaper.desktop",
+  "productName": "Inkwash Desktop",
+  "version": "0.4.0",
+  "identifier": "dev.inkwash.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Inkpaper Desktop",
+        "title": "Inkwash Desktop",
         "width": 1180,
         "height": 780,
         "minWidth": 900,
