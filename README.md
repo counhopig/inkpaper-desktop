@@ -28,7 +28,10 @@ It does **not** author content on the device. Four jobs:
   [`docs/control-protocol.md`](https://github.com/counhopig/inkpaper-firmware/blob/main/docs/control-protocol.md).
 - **Content** — register devices and manage their alarms/todos against
   `inkpaper-server`'s admin API. This is where actual content gets
-  authored; the device just pulls it later over Wi-Fi.
+  authored; the device just pulls it later over Wi-Fi. Also manages
+  **channels** (create webhook channels, copy the one-time delivery token,
+  rotate it) and the device **inbox** (view/delete messages pushed from
+  external sources).
 - **Logs** — real-time diagnostics, mirrored to disk (see
   [Logging](#logging)).
 
