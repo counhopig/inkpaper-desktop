@@ -188,7 +188,7 @@ fn parse_netsh(text: &str) -> Vec<WifiNetwork> {
             networks.push(n);
         }
     }
-    networks.sort_by(|a, b| b.signal.cmp(&a.signal));
+    networks.sort_by_key(|n| std::cmp::Reverse(n.signal));
     networks
 }
 
@@ -243,7 +243,7 @@ fn parse_nmcli(text: &str) -> Vec<WifiNetwork> {
             security,
         });
     }
-    networks.sort_by(|a, b| b.signal.cmp(&a.signal));
+    networks.sort_by_key(|n| std::cmp::Reverse(n.signal));
     networks
 }
 
