@@ -18,14 +18,16 @@ const REPLY_PREFIX: &str = "<<IW ";
 const BAUD_RATE: u32 = 115_200;
 
 pub enum UsbEvent {
-    Reply(Reply),
+    /// `id` is the reply's correlation id (see `protocol::decode_reply`),
+    /// `None` if the device didn't echo one back.
+    Reply(Option<String>, Reply),
     Log(String),
     /// The port closed or errored; the worker thread has exited.
     Disconnected(String),
 }
 
 pub struct UsbLink {
-    pub(crate) cmd_tx: mpsc::Sender<Command>,
+    pub(crate) cmd_tx: mpsc::Sender<(String, Command)>,
     pub event_rx: mpsc::Receiver<UsbEvent>,
 }
 
@@ -46,7 +48,7 @@ impl UsbLink {
         port.write_request_to_send(false)
             .map_err(|e| anyhow::anyhow!("failed to release RTS on {port_name}: {e}"))?;
 
-        let (cmd_tx, cmd_rx) = mpsc::channel::<Command>();
+        let (cmd_tx, cmd_rx) = mpsc::channel::<(String, Command)>();
         let (event_tx, event_rx) = mpsc::channel::<UsbEvent>();
 
         thread::spawn(move || run_worker(port, cmd_rx, event_tx));
@@ -54,16 +56,19 @@ impl UsbLink {
         Ok(Self { cmd_tx, event_rx })
     }
 
-    pub fn send(&self, cmd: Command) -> anyhow::Result<()> {
+    /// `id` is the request correlation id to attach - generate one with
+    /// `protocol::next_request_id()` and reuse it across resends of the
+    /// same logical request.
+    pub fn send(&self, id: &str, cmd: Command) -> anyhow::Result<()> {
         self.cmd_tx
-            .send(cmd)
+            .send((id.to_string(), cmd))
             .map_err(|_| anyhow::anyhow!("USB worker thread is gone"))
     }
 }
 
 fn run_worker(
     mut port: Box<dyn serialport::SerialPort>,
-    cmd_rx: mpsc::Receiver<Command>,
+    cmd_rx: mpsc::Receiver<(String, Command)>,
     event_tx: mpsc::Sender<UsbEvent>,
 ) {
     let mut line_buf: Vec<u8> = Vec::new();
@@ -71,8 +76,8 @@ fn run_worker(
     loop {
         // Drain any queued outgoing commands first - cheap, and keeps
         // command latency low relative to the read timeout below.
-        while let Ok(cmd) = cmd_rx.try_recv() {
-            let line = format!("{COMMAND_PREFIX}{}\n", protocol::encode_command(&cmd));
+        while let Ok((id, cmd)) = cmd_rx.try_recv() {
+            let line = format!("{COMMAND_PREFIX}{}\n", protocol::encode_command(&cmd, &id));
             if let Err(e) = port.write_all(line.as_bytes()) {
                 let _ = event_tx.send(UsbEvent::Disconnected(format!("write failed: {e}")));
                 return;
@@ -90,8 +95,8 @@ fn run_worker(
                         line_buf.clear();
                         if let Some(json) = line.strip_prefix(REPLY_PREFIX) {
                             match protocol::decode_reply(json) {
-                                Ok(reply) => {
-                                    if event_tx.send(UsbEvent::Reply(reply)).is_err() {
+                                Ok((id, reply)) => {
+                                    if event_tx.send(UsbEvent::Reply(id, reply)).is_err() {
                                         return;
                                     }
                                 }

@@ -27,7 +27,7 @@ use tauri::{AppHandle, Emitter, State};
 
 use crate::desktop::SharedState;
 use crate::error::AppError;
-use crate::protocol::{Command, Reply};
+use crate::protocol::{self, Command, Reply};
 use crate::state::{AppState, BleHandle, LinkState, UsbHandle};
 use crate::transport::{ble::BleLink, usb::UsbLink};
 
@@ -97,13 +97,82 @@ fn result_from_reply(reply: Reply) -> DeviceCommandResult {
             message,
             status: None,
         },
+        // `send_and_wait` intercepts `Busy` itself (auto-retry) before this
+        // function ever sees one; this arm only exists for exhaustiveness.
+        Reply::Busy => DeviceCommandResult {
+            kind: "busy".into(),
+            message: "Device is showing a reminder; retrying".into(),
+            status: None,
+        },
     }
+}
+
+enum Phase {
+    Usb,
+    Ble,
+}
+
+/// Resends `command` (under the same `request_id`) on whichever transport
+/// `phase` says is active. Used both for the USB boot-reset retry and for
+/// an automatic retry after a `busy` reply - a stale phase (link swapped
+/// out from under us) is simply a no-op, same as before this existed.
+fn resend(state: &AppState, phase: &Phase, request_id: &str, command: &Command) {
+    let Ok(mut guard) = state.link.lock() else {
+        return;
+    };
+    match (&mut *guard, phase) {
+        (LinkState::Usb(handle), Phase::Usb) => {
+            let _ = handle.send(request_id, command.clone());
+        }
+        (LinkState::Ble(handle), Phase::Ble) => {
+            let _ = handle.send(request_id, command.clone());
+        }
+        _ => {}
+    }
+}
+
+/// Common handling for a reply arriving on either transport: verifies it
+/// answers `request_id` (a reply carrying a *different* id belongs to some
+/// other in-flight/stale request and is logged and ignored, never treated
+/// as our answer; a reply with no id at all is from firmware that predates
+/// this feature and is accepted on trust, matching the old behavior), then
+/// either auto-retries on `Busy` or returns the final result.
+fn handle_reply(
+    state: &AppState,
+    phase: &Phase,
+    request_id: &str,
+    command: &Command,
+    reply_id: Option<String>,
+    reply: Reply,
+) -> Option<DeviceCommandResult> {
+    if let Some(rid) = &reply_id {
+        if rid != request_id {
+            state.logs.info(
+                "device",
+                format!("← reply id '{rid}' does not match in-flight request '{request_id}'; ignoring"),
+            );
+            return None;
+        }
+    }
+    state.logs.info(
+        "device",
+        format!(
+            "← {}",
+            serde_json::to_string(&reply).unwrap_or_else(|_| "<unprintable>".into())
+        ),
+    );
+    if matches!(reply, Reply::Busy) {
+        resend(state, phase, request_id, command);
+        return None;
+    }
+    Some(result_from_reply(reply))
 }
 
 /// Send `command` to the device and wait up to `DEVICE_CMD_TIMEOUT` for
 /// a `Reply`. Synchronous - it blocks for up to 45s on the worker's
 /// mpsc receiver. Wrap in `spawn_blocking` at the command entry point.
 fn send_and_wait(state: &AppState, command: Command) -> Result<DeviceCommandResult, AppError> {
+    let request_id = protocol::next_request_id();
     let deadline = Instant::now() + DEVICE_CMD_TIMEOUT;
     let mut next_resend = Instant::now() + RETRY_INTERVAL;
 
@@ -112,15 +181,11 @@ fn send_and_wait(state: &AppState, command: Command) -> Result<DeviceCommandResu
     state.logs.info(
         "device",
         format!(
-            "→ {}",
+            "→ [{request_id}] {}",
             serde_json::to_string(&command).unwrap_or_else(|_| "<unprintable>".into())
         ),
     );
 
-    enum Phase {
-        Usb,
-        Ble,
-    }
     let phase = {
         let mut guard = state
             .link
@@ -129,11 +194,11 @@ fn send_and_wait(state: &AppState, command: Command) -> Result<DeviceCommandResu
         match &mut *guard {
             LinkState::Disconnected => return Err(AppError::device_not_connected()),
             LinkState::Usb(handle) => {
-                handle.send(command.clone())?;
+                handle.send(&request_id, command.clone())?;
                 Phase::Usb
             }
             LinkState::Ble(handle) => {
-                handle.send(command.clone())?;
+                handle.send(&request_id, command.clone())?;
                 Phase::Ble
             }
         }
@@ -167,27 +232,21 @@ fn send_and_wait(state: &AppState, command: Command) -> Result<DeviceCommandResu
 
         let Some(tick) = tick else { continue };
         match tick {
-            TickEvent::Usb(Ok(crate::transport::usb::UsbEvent::Reply(reply))) => {
-                let result = result_from_reply(reply.clone());
-                state.logs.info(
-                    "device",
-                    format!(
-                        "← {}",
-                        serde_json::to_string(&reply).unwrap_or_else(|_| "<unprintable>".into())
-                    ),
-                );
-                return Ok(result);
+            TickEvent::Usb(Ok(crate::transport::usb::UsbEvent::Reply(id, reply))) => {
+                if let Some(result) =
+                    handle_reply(state, &phase, &request_id, &command, id, reply)
+                {
+                    return Ok(result);
+                }
+                next_resend = Instant::now() + RETRY_INTERVAL;
             }
-            TickEvent::Ble(Ok(crate::transport::ble::BleEvent::Reply(reply))) => {
-                let result = result_from_reply(reply.clone());
-                state.logs.info(
-                    "device",
-                    format!(
-                        "← {}",
-                        serde_json::to_string(&reply).unwrap_or_else(|_| "<unprintable>".into())
-                    ),
-                );
-                return Ok(result);
+            TickEvent::Ble(Ok(crate::transport::ble::BleEvent::Reply(id, reply))) => {
+                if let Some(result) =
+                    handle_reply(state, &phase, &request_id, &command, id, reply)
+                {
+                    return Ok(result);
+                }
+                next_resend = Instant::now() + RETRY_INTERVAL;
             }
             TickEvent::Usb(Ok(crate::transport::usb::UsbEvent::Log(line)))
             | TickEvent::Ble(Ok(crate::transport::ble::BleEvent::Log(line))) => {
@@ -200,11 +259,7 @@ fn send_and_wait(state: &AppState, command: Command) -> Result<DeviceCommandResu
             }
             TickEvent::Usb(Err(_)) | TickEvent::Ble(Err(_)) => {
                 if matches!(phase, Phase::Usb) && Instant::now() >= next_resend {
-                    if let Ok(mut guard) = state.link.lock() {
-                        if let LinkState::Usb(handle) = &mut *guard {
-                            let _ = handle.send(command.clone());
-                        }
-                    }
+                    resend(state, &phase, &request_id, &command);
                     next_resend = Instant::now() + RETRY_INTERVAL;
                 }
                 continue;

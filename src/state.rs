@@ -74,7 +74,7 @@ impl LinkState {
 /// behind its own `Mutex` so the long blocking `recv_timeout()` in a
 /// command does not serialise behind the application-wide `link` lock.
 pub struct UsbHandle {
-    cmd_tx: mpsc::Sender<Command>,
+    cmd_tx: mpsc::Sender<(String, Command)>,
     event_rx: Mutex<mpsc::Receiver<UsbEvent>>,
 }
 
@@ -87,9 +87,12 @@ impl UsbHandle {
         }
     }
 
-    pub fn send(&self, cmd: Command) -> Result<(), crate::error::AppError> {
+    /// `id` is the request correlation id to attach - generate one with
+    /// `protocol::next_request_id()` and reuse it across resends of the
+    /// same logical request.
+    pub fn send(&self, id: &str, cmd: Command) -> Result<(), crate::error::AppError> {
         self.cmd_tx
-            .send(cmd)
+            .send((id.to_string(), cmd))
             .map_err(|_| crate::error::AppError::internal("USB worker thread is gone"))
     }
 
@@ -103,7 +106,7 @@ impl UsbHandle {
 
 /// Same shape as `UsbHandle`, for the BLE transport.
 pub struct BleHandle {
-    cmd_tx: mpsc::Sender<Command>,
+    cmd_tx: mpsc::Sender<(String, Command)>,
     event_rx: Mutex<mpsc::Receiver<BleEvent>>,
 }
 
@@ -116,9 +119,12 @@ impl BleHandle {
         }
     }
 
-    pub fn send(&self, cmd: Command) -> Result<(), crate::error::AppError> {
+    /// `id` is the request correlation id to attach - generate one with
+    /// `protocol::next_request_id()` and reuse it across resends of the
+    /// same logical request.
+    pub fn send(&self, id: &str, cmd: Command) -> Result<(), crate::error::AppError> {
         self.cmd_tx
-            .send(cmd)
+            .send((id.to_string(), cmd))
             .map_err(|_| crate::error::AppError::internal("BLE worker thread is gone"))
     }
 

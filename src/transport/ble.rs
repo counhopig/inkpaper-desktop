@@ -25,13 +25,15 @@ const NOTIFY_CHAR_UUID: &str = "d2c25e52-5e22-48d8-a8b3-34f2f8e2c7d4";
 const DEVICE_NAME: &str = "Inkwash";
 
 pub enum BleEvent {
-    Reply(Reply),
+    /// `id` is the reply's correlation id (see `protocol::decode_reply`),
+    /// `None` if the device didn't echo one back.
+    Reply(Option<String>, Reply),
     Log(String),
     Disconnected(String),
 }
 
 pub struct BleLink {
-    pub(crate) cmd_tx: mpsc::Sender<Command>,
+    pub(crate) cmd_tx: mpsc::Sender<(String, Command)>,
     pub event_rx: mpsc::Receiver<BleEvent>,
 }
 
@@ -91,7 +93,7 @@ impl BleLink {
     /// or `tokio::task::spawn_blocking`, not directly from the UI's
     /// `update()`.
     pub fn connect() -> anyhow::Result<Self> {
-        let (cmd_tx, cmd_rx) = mpsc::channel::<Command>();
+        let (cmd_tx, cmd_rx) = mpsc::channel::<(String, Command)>();
         let (event_tx, event_rx) = mpsc::channel::<BleEvent>();
         let (ready_tx, ready_rx) = mpsc::channel::<anyhow::Result<()>>();
 
@@ -128,16 +130,19 @@ impl BleLink {
         Ok(Self { cmd_tx, event_rx })
     }
 
+    /// `id` is the request correlation id to attach - generate one with
+    /// `protocol::next_request_id()` and reuse it across resends of the
+    /// same logical request.
     #[allow(dead_code)]
-    pub fn send(&self, cmd: Command) -> anyhow::Result<()> {
+    pub fn send(&self, id: &str, cmd: Command) -> anyhow::Result<()> {
         self.cmd_tx
-            .send(cmd)
+            .send((id.to_string(), cmd))
             .map_err(|_| anyhow::anyhow!("BLE worker thread is gone"))
     }
 }
 
 async fn connect_and_run(
-    cmd_rx: mpsc::Receiver<Command>,
+    cmd_rx: mpsc::Receiver<(String, Command)>,
     event_tx: mpsc::Sender<BleEvent>,
     ready_tx: &mpsc::Sender<anyhow::Result<()>>,
 ) -> anyhow::Result<()> {
@@ -190,8 +195,8 @@ async fn connect_and_run(
     // `.await`ed directly - a short sleep keeps this from busy-spinning
     // between notification arrivals.
     loop {
-        while let Ok(cmd) = cmd_rx.try_recv() {
-            let payload = protocol::encode_command(&cmd);
+        while let Ok((id, cmd)) = cmd_rx.try_recv() {
+            let payload = protocol::encode_command(&cmd, &id);
             if let Err(e) = peripheral
                 .write(&write_char, payload.as_bytes(), WriteType::WithResponse)
                 .await
@@ -207,8 +212,8 @@ async fn connect_and_run(
             Ok(Some(data)) => {
                 let text = String::from_utf8_lossy(&data.value).to_string();
                 match protocol::decode_reply(&text) {
-                    Ok(reply) => {
-                        if event_tx.send(BleEvent::Reply(reply)).is_err() {
+                    Ok((id, reply)) => {
+                        if event_tx.send(BleEvent::Reply(id, reply)).is_err() {
                             return Ok(());
                         }
                     }

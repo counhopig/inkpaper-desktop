@@ -82,7 +82,8 @@ fn cli_usb_command(port: &str, timeout_seconds: u64, action: CliAction) {
             std::process::exit(1);
         }
     };
-    if let Err(err) = link.send(action.command()) {
+    let request_id = protocol::next_request_id();
+    if let Err(err) = link.send(&request_id, action.command()) {
         eprintln!("send failed: {err}");
         std::process::exit(1);
     }
@@ -97,7 +98,21 @@ fn cli_usb_command(port: &str, timeout_seconds: u64, action: CliAction) {
             .event_rx
             .recv_timeout(std::time::Duration::from_millis(200))
         {
-            Ok(UsbEvent::Reply(reply)) => {
+            Ok(UsbEvent::Reply(id, reply)) => {
+                if let Some(rid) = &id {
+                    if rid != &request_id {
+                        println!("(ignoring reply for stale request id {rid})");
+                        continue;
+                    }
+                }
+                if matches!(reply, protocol::Reply::Busy) {
+                    println!("(device busy showing a reminder; retrying)");
+                    if let Err(err) = link.send(&request_id, action.command()) {
+                        eprintln!("retry send failed: {err}");
+                    }
+                    next_send = std::time::Instant::now() + std::time::Duration::from_secs(2);
+                    continue;
+                }
                 println!("{reply:?}");
                 return;
             }
@@ -108,7 +123,7 @@ fn cli_usb_command(port: &str, timeout_seconds: u64, action: CliAction) {
             }
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                 if std::time::Instant::now() >= next_send {
-                    if let Err(err) = link.send(action.command()) {
+                    if let Err(err) = link.send(&request_id, action.command()) {
                         eprintln!("retry send failed: {err}");
                     }
                     next_send = std::time::Instant::now() + std::time::Duration::from_secs(2);

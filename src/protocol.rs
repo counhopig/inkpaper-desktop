@@ -5,7 +5,18 @@
 //! carry the same JSON payloads; only the framing differs (see
 //! `transport::usb` vs `transport::ble`).
 
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use serde::{Deserialize, Serialize};
+
+/// Generates a fresh, process-unique request correlation id (see
+/// `encode_command`). Callers should generate one per logical request and
+/// reuse it across any resends of that same request, not mint a new one per
+/// resend attempt - a delayed reply to an earlier resend must still match.
+pub fn next_request_id() -> String {
+    static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+    format!("req-{}", NEXT_ID.fetch_add(1, Ordering::Relaxed))
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "cmd", rename_all = "snake_case")]
@@ -22,6 +33,10 @@ pub enum Command {
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum Reply {
     Ok,
+    /// The device was showing a full-screen reminder (due-todo or urgent
+    /// inbox) and did not execute the command - see `control-protocol.md`'s
+    /// `Busy` reply. Not executed, safe to resend.
+    Busy,
     Status {
         wifi_configured: bool,
         server_configured: bool,
@@ -42,39 +57,115 @@ pub enum Reply {
     },
 }
 
-pub fn encode_command(cmd: &Command) -> String {
-    serde_json::to_string(cmd).expect("Command always serializes")
+/// Encodes `cmd` as JSON with a top-level `id` field (any string) added so
+/// the reply can be matched back to this specific request - see
+/// `control-protocol.md`'s "Request Correlation" section. The firmware
+/// echoes `id` back on the reply unchanged; older firmware without this
+/// feature just ignores the extra field.
+pub fn encode_command(cmd: &Command, id: &str) -> String {
+    let mut value = serde_json::to_value(cmd).expect("Command always serializes");
+    if let Some(obj) = value.as_object_mut() {
+        obj.insert("id".to_string(), serde_json::Value::String(id.to_string()));
+    }
+    value.to_string()
 }
 
-pub fn decode_reply(line: &str) -> anyhow::Result<Reply> {
-    serde_json::from_str(line).map_err(|e| anyhow::anyhow!("failed to parse reply '{line}': {e}"))
+/// Decodes a reply line, returning its correlation `id` alongside it.
+/// `id` is `None` when the device didn't echo one back - either the
+/// triggering command had none, or (for `main.rs`'s CLI, which doesn't set
+/// one) always. Callers that care about matching a specific in-flight
+/// request should treat `None` as "can't verify, accept on trust" rather
+/// than a mismatch, since older firmware never sends `id` at all.
+pub fn decode_reply(line: &str) -> anyhow::Result<(Option<String>, Reply)> {
+    let value: serde_json::Value = serde_json::from_str(line)
+        .map_err(|e| anyhow::anyhow!("failed to parse reply '{line}': {e}"))?;
+    let id = value
+        .get("id")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let reply = serde_json::from_value(value)
+        .map_err(|e| anyhow::anyhow!("failed to parse reply '{line}': {e}"))?;
+    Ok((id, reply))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// Parses `json` back and checks it has exactly the expected top-level
+    /// keys/values, independent of the field order `serde_json::Value`
+    /// happens to serialize in.
+    fn assert_json_object_eq(json: &str, expected: &[(&str, serde_json::Value)]) {
+        let value: serde_json::Value = serde_json::from_str(json).unwrap();
+        let obj = value.as_object().expect("expected a JSON object");
+        assert_eq!(obj.len(), expected.len(), "field count mismatch in {json}");
+        for (key, expected_value) in expected {
+            assert_eq!(obj.get(*key), Some(expected_value), "field '{key}' in {json}");
+        }
+    }
+
     #[test]
     fn firmware_commands_use_expected_wire_names() {
-        assert_eq!(
-            encode_command(&Command::GetStatus),
-            r#"{"cmd":"get_status"}"#
+        assert_json_object_eq(
+            &encode_command(&Command::GetStatus, "1"),
+            &[
+                ("cmd", "get_status".into()),
+                ("id", "1".into()),
+            ],
         );
-        assert_eq!(
-            encode_command(&Command::ClearAlarms),
-            r#"{"cmd":"clear_alarms"}"#
+        assert_json_object_eq(
+            &encode_command(&Command::ClearAlarms, "2"),
+            &[
+                ("cmd", "clear_alarms".into()),
+                ("id", "2".into()),
+            ],
         );
-        assert_eq!(
-            encode_command(&Command::SetTimezone {
-                offset_minutes: 480
-            }),
-            r#"{"cmd":"set_timezone","offset_minutes":480}"#
+        assert_json_object_eq(
+            &encode_command(
+                &Command::SetTimezone {
+                    offset_minutes: 480,
+                },
+                "3",
+            ),
+            &[
+                ("cmd", "set_timezone".into()),
+                ("id", "3".into()),
+                ("offset_minutes", 480.into()),
+            ],
         );
     }
 
     #[test]
+    fn request_ids_are_unique_and_ordered() {
+        let a = next_request_id();
+        let b = next_request_id();
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn decodes_reply_id_when_present() {
+        let (id, reply) =
+            decode_reply(r#"{"status":"ok","id":"req-42"}"#).unwrap();
+        assert_eq!(id.as_deref(), Some("req-42"));
+        assert!(matches!(reply, Reply::Ok));
+    }
+
+    #[test]
+    fn decodes_reply_with_no_id_as_none() {
+        let (id, reply) = decode_reply(r#"{"status":"ok"}"#).unwrap();
+        assert_eq!(id, None);
+        assert!(matches!(reply, Reply::Ok));
+    }
+
+    #[test]
+    fn decodes_busy_reply() {
+        let (_id, reply) = decode_reply(r#"{"status":"busy"}"#).unwrap();
+        assert!(matches!(reply, Reply::Busy));
+    }
+
+    #[test]
     fn decodes_status_reply() {
-        let reply = decode_reply(
+        let (_id, reply) = decode_reply(
             r#"{"status":"status","wifi_configured":true,"server_configured":false,"wifi_connected":true,"wifi_ssid":"MyNet","wifi_has_password":true,"server_url":"http://192.168.1.10:8080/api/sync","server_has_token":true,"timezone_offset_minutes":480}"#,
         )
         .unwrap();
@@ -107,7 +198,7 @@ mod tests {
 
     #[test]
     fn decodes_legacy_status_reply_without_new_fields() {
-        let reply = decode_reply(
+        let (_id, reply) = decode_reply(
             r#"{"status":"status","wifi_configured":true,"server_configured":false,"wifi_connected":false}"#,
         )
         .unwrap();
