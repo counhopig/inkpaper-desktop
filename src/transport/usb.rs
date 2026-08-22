@@ -16,6 +16,17 @@ use crate::protocol::{self, Command, Reply};
 const COMMAND_PREFIX: &str = ">>IW ";
 const REPLY_PREFIX: &str = "<<IW ";
 const BAUD_RATE: u32 = 115_200;
+/// How long a single `port.read()` call blocks with nothing available -
+/// short, since `run_worker`'s loop re-checks the outgoing command queue
+/// every time this elapses.
+const READ_TIMEOUT: Duration = Duration::from_millis(200);
+/// `serialport` shares one timeout value for both directions, so a write
+/// borrows this longer one for its duration and restores `READ_TIMEOUT`
+/// right after. 200ms was too tight: a resend landing during the device's
+/// brief but interrupt-heavy Wi-Fi association window could trip it and
+/// tear down the whole connection over a transient stall, not an actual
+/// disconnect.
+const WRITE_TIMEOUT: Duration = Duration::from_secs(2);
 
 pub enum UsbEvent {
     /// `id` is the reply's correlation id (see `protocol::decode_reply`),
@@ -35,7 +46,7 @@ impl UsbLink {
     /// Opens `port_name` and spawns the reader/writer worker thread.
     pub fn connect(port_name: &str) -> anyhow::Result<Self> {
         let mut port = serialport::new(port_name, BAUD_RATE)
-            .timeout(Duration::from_millis(200))
+            .timeout(READ_TIMEOUT)
             .open()
             .map_err(|e| anyhow::anyhow!("failed to open {port_name}: {e}"))?;
 
@@ -78,7 +89,41 @@ fn run_worker(
         // command latency low relative to the read timeout below.
         while let Ok((id, cmd)) = cmd_rx.try_recv() {
             let line = format!("{COMMAND_PREFIX}{}\n", protocol::encode_command(&cmd, &id));
-            if let Err(e) = port.write_all(line.as_bytes()) {
+            if let Err(e) = port.set_timeout(WRITE_TIMEOUT) {
+                let _ = event_tx.send(UsbEvent::Disconnected(format!(
+                    "failed to set write timeout: {e}"
+                )));
+                return;
+            }
+            let write_result = port.write_all(line.as_bytes());
+            // Restore the short read timeout regardless of how the write
+            // went, so a failed write doesn't also wedge the read loop
+            // below at the long timeout for however long this thread lives.
+            if let Err(e) = port.set_timeout(READ_TIMEOUT) {
+                let _ = event_tx.send(UsbEvent::Disconnected(format!(
+                    "failed to restore read timeout: {e}"
+                )));
+                return;
+            }
+            if let Err(e) = write_result {
+                if e.kind() == std::io::ErrorKind::TimedOut {
+                    // The device didn't drain its input in time. Most
+                    // likely it's still busy executing an earlier command -
+                    // `control::dispatch` is synchronous and the firmware
+                    // stops polling USB for the whole duration of a slow
+                    // one like sync_now, which can run well past this
+                    // write's timeout. That's not a disconnect: drop this
+                    // one write attempt (nothing was sent - `write()` waits
+                    // for POLLOUT before attempting any bytes, so this can't
+                    // have left a partial, framing-corrupting line on the
+                    // wire) and let the caller's own resend timer try again.
+                    // A real disconnect still surfaces via the read side
+                    // below.
+                    let _ = event_tx.send(UsbEvent::Log(format!(
+                        "(write timed out, device likely busy; will retry: {e})"
+                    )));
+                    break;
+                }
                 let _ = event_tx.send(UsbEvent::Disconnected(format!("write failed: {e}")));
                 return;
             }
